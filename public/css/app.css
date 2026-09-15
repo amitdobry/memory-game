@@ -42,6 +42,27 @@ button {
   font-family: inherit;
 }
 
+/*
+  Grid and flex tracks refuse to shrink below their content's min-content width —
+  `1fr` really means `minmax(auto, 1fr)`. An 8-column board of cards has a wide
+  min-content size, so on a phone the whole layout silently grew to 474px inside a
+  375px viewport and `overflow: hidden` clipped the left edge away. Nothing scrolled,
+  so nothing looked broken except that the game was cut in half.
+
+  These zeroes are what let the layout actually be as narrow as the screen.
+*/
+.workbench,
+.workbench__stage,
+.workbench__side,
+.topbar__actions,
+.chat,
+.chat__log,
+.chat__ideas,
+.game,
+.board {
+  min-width: 0;
+}
+
 /* ---------- shared bits --------------------------------------------------- */
 
 .btn {
@@ -161,6 +182,14 @@ button {
 
 .shell {
   display: grid;
+  /*
+    The columns line is load-bearing, and its absence was the real phone bug.
+    Declaring only `grid-template-rows` leaves the implicit column at `auto`, which
+    means max-content — so an 8-column board stretched the entire app to 474px inside
+    a 375px viewport, and `overflow: hidden` quietly clipped the left edge away.
+    minmax(0, 1fr) is what pins the layout to the screen's width.
+  */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   height: 100vh;
   height: 100dvh;
@@ -196,7 +225,7 @@ button {
 
 .workbench {
   display: grid;
-  grid-template-columns: 1fr minmax(330px, 30%);
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 30%);
   overflow: hidden;
 }
 .workbench__stage {
@@ -648,12 +677,26 @@ dialog.share::backdrop {
   50% { opacity: 0.45; }
 }
 
+/*
+  The board is shaped by the game, not by the screen.
+
+  Equal fr tracks in both directions plus an aspect-ratio of cols/rows makes every
+  cell square without the cards asserting it themselves — which is what lets the
+  whole board shrink to fit a short phone instead of overflowing it. The cards used
+  to carry `aspect-ratio: 1`, and a card that insists on its own height cannot be
+  told to fit.
+*/
 .board {
   display: grid;
   grid-template-columns: repeat(var(--cols), 1fr);
-  gap: clamp(4px, 1.2vw, 10px);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  aspect-ratio: var(--cols) / var(--rows);
+  gap: clamp(3px, 1.1vw, 10px);
   margin: 0 auto;
+  width: 100%;
   max-width: min(100%, calc(var(--cols) * 110px));
+  max-height: 100%;
+  min-height: 0;
 }
 
 .card {
@@ -661,9 +704,10 @@ dialog.share::backdrop {
   border: 0;
   padding: 0;
   background: none;
-  aspect-ratio: 1;
   cursor: pointer;
   perspective: 700px;
+  min-width: 0;
+  min-height: 0;
 }
 .card__inner {
   position: relative;
@@ -804,27 +848,56 @@ dialog.share::backdrop {
     overflow: hidden;
   }
   .workbench {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     /* minmax(0, ...) on both: without the 0 floor, a grid row refuses to shrink
        below its content and the board pushes the chat off-screen again. */
-    grid-template-rows: minmax(0, 1fr) minmax(0, 46%);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 44%);
     overflow: hidden;
+  }
+  /* A phone's own browser chrome already costs two rows; the app should not add a
+     third. One scrolling line of buttons instead of two stacked ones. */
+  .topbar__actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .topbar__actions .btn {
+    flex: none;
+    white-space: nowrap;
+  }
+  .topbar__avatar {
+    width: 32px;
+    height: 32px;
+  }
+  .topbar__who {
+    font-size: 0.95rem;
   }
   .workbench__side {
     border-inline-start: 0;
     border-top: 1px solid var(--shell-line);
   }
+  /*
+    align-items: center on a scrolling box was a real bug on a real phone: content
+    taller than the box overflows in BOTH directions and the top rows become
+    unreachable even by scrolling. Stretch instead, and let the board fit.
+  */
   .workbench__stage {
-    padding: 0.6rem;
-    align-items: center;
+    padding: 0.5rem;
+    align-items: stretch;
+    overflow: hidden;
   }
   .game {
-    padding: 0.7rem;
+    padding: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
   }
-  /* The board is now height-bound, not width-bound: it must fit the space left
-     over, however many columns the child asked for. */
+  /* The board takes whatever the header and footer leave, and no more. */
   .board {
-    max-width: min(100%, calc(var(--cols) * 64px));
+    flex: 1 1 auto;
+    min-height: 0;
+    max-width: 100%;
   }
   .game__header {
     margin-bottom: 0.6rem;

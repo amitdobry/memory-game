@@ -161,6 +161,9 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
 
     const board = el("div", "board");
     board.style.setProperty("--cols", config.cols);
+    // Both are needed: the board derives its aspect ratio from them and sizes
+    // itself to whatever space is left, rather than overflowing a phone.
+    board.style.setProperty("--rows", config.rows);
     for (const card of state.deck) board.append(renderCard(card));
     root.append(board);
 
