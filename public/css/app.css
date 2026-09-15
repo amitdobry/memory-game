@@ -96,6 +96,17 @@ button {
   background: var(--shell-accent-soft);
   color: var(--shell-accent);
 }
+/* Reserved for the one button that destroys a child's work. */
+.btn--danger {
+  color: #a8342f;
+  border-color: #f0c4c1;
+}
+.btn--danger:hover {
+  background: #fdecec;
+  color: #8f2420;
+  border-color: #e39b96;
+}
+
 .btn--small {
   padding: 0.45rem 0.9rem;
   font-size: 0.87rem;

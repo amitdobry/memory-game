@@ -23,7 +23,6 @@ import {
   pushHistory,
   popHistory,
   loadHistory,
-  clearHistory,
   shareUrl,
 } from "./storage.js";
 
@@ -437,11 +436,33 @@ function undoLast() {
 undoBtn.addEventListener("click", undoLast);
 refreshUndo();
 
+/*
+  This button was called "להתחיל מהתחלה" and sat one row above "משחק חדש". Both
+  read as "start again" to a ten-year-old; only one of them throws away an hour of
+  their work. A child pressed it expecting a fresh round and watched their game go
+  back to grey.
+
+  Three things changed. It says what it destroys. It looks dangerous. And it is
+  now undoable — it used to clear the history FIRST, so the one button that could
+  have saved them was disarmed by the button that hurt them.
+*/
 document.getElementById("reset").addEventListener("click", () => {
-  if (!confirm("זה מחזיר את המשחק בדיוק למצב ההתחלתי. כל השינויים שעשיתם ייעלמו. בטוחים?")) return;
-  clearHistory(user.id);
-  applyConfig({ ...STARTER_CONFIG }, { record: false });
-  addMessage("system", "התחלנו מחדש מהמשחק הבסיסי.");
+  const changes = diff(STARTER_CONFIG, config).length;
+  if (changes === 0) {
+    addMessage("system", "המשחק כבר במצב ההתחלתי.");
+    return;
+  }
+  const ok = confirm(
+    `למחוק את ${changes} השינויים שעשיתם ולחזור למשחק האפור הבסיסי?
+
+` +
+      `אם רק רציתם לשחק סיבוב חדש — סגרו את זה ולחצו על "משחק חדש" מתחת ללוח.`,
+  );
+  if (!ok) return;
+
+  // Recorded, so "בטל שינוי אחרון" brings the whole game back.
+  applyConfig({ ...STARTER_CONFIG });
+  addMessage("system", "מחקתי הכל וחזרנו למשחק הבסיסי. אפשר לבטל עם ״בטל שינוי אחרון״.");
 });
 
 const dialog = document.getElementById("shareDialog");
