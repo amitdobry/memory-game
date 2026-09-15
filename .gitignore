@@ -1,7 +1,7 @@
-# NEVER commit the API key.
+# This app holds no credential — the AI lives in LIVE, which holds the key.
+# These stay ignored anyway so a stray local file can never become a commit.
 .env
 .env.*
-!.env.example
 
 node_modules/
 *.log

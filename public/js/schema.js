@@ -52,6 +52,16 @@ export const CARD_SETS = {
     kind: "emoji",
     symbols: [..."🍕🍔🍟🌭🥪🌮🌯🥙🧆🥗🍝🍜🍲🍛🍣🍱🥟🍤🍙🍚🍘🥠🍢🍡🍧🍨🍦🥧🧁🍰🎂🍩"],
   },
+  sweets: {
+    label: "ממתקים",
+    kind: "emoji",
+    symbols: ["🍬","🍭","🍫","🍩","🧁","🍰","🎂","🍦","🍨","🍧","🥧","🍪","🍮","🍯","🥞","🧇","🍓","🍒","🥐","🥨","🍡","🍢","🍿","🥤","🧃","🍹","🍎","🍇","🍑","🍉","🥜","🌰"],
+  },
+  ocean: {
+    label: "ים",
+    kind: "emoji",
+    symbols: ["🐠","🐟","🐡","🦈","🐬","🐳","🐙","🦑","🦐","🦀","🐚","🌊","⛵","🚤","🏄","🐢","🦭","🐋","🦞","🐊","⚓","🦩","🐧","🍤","🥥","🩴","🤿","🚢","🌴","🪸","🪼","🧊"],
+  },
   custom: { label: "משלי (אני בוחר/ת)", kind: "emoji" },
 };
 
@@ -245,6 +255,27 @@ export const FIELDS = [
     help: "מה כתוב כשנגמר הזמן.",
   },
 ];
+
+
+/**
+ * What a child means when they name a *world* rather than a setting.
+ *
+ * "תעשה לי נושא של ממתקים" is one request about two fields — the colours and the
+ * pictures on the cards. Candy cards on a grey background reads as "you didn't
+ * understand me". This table is what makes the AI change both, and it is data rather
+ * than prompt prose so that adding a theme cannot silently forget to add its cards.
+ *
+ * A theme with no natural card set maps to null and simply leaves the cards alone.
+ */
+export const THEME_CARD_SET = {
+  plain: null,
+  space: "space",
+  candy: "sweets",
+  jungle: "animals",
+  ocean: "ocean",
+  neon: null,
+  sunset: null,
+};
 
 export const GROUPS = [
   { key: "mode", label: "מצב משחק" },

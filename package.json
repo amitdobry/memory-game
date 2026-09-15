@@ -3,14 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Memory-match game the kids finish with AI — workshop starter (the 75%)",
+  "description": "Memory game the kids finish with AI — static site; the AI lives in LIVE",
   "scripts": {
-    "start": "node --env-file-if-exists=.env server/index.js",
-    "dev": "node --watch --env-file-if-exists=.env server/index.js",
-    "build:avatars": "node scripts/make-avatars.mjs"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.72.0"
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "build:avatars": "node scripts/make-avatars.mjs",
+    "export:contract": "node scripts/export-contract.mjs"
   },
   "engines": {
     "node": ">=20"
