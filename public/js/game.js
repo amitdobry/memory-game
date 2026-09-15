@@ -23,38 +23,6 @@ const shuffle = (arr) => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** A small, stable string hash — enough to turn a config into a seed. */
-function hash(text) {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) {
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-/** mulberry32 — tiny, seeded, and good enough to choose a cast of cards. */
-function seededRandom(seed) {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/** The same pool and seed always yield the same picks, in the same order. */
-function deterministicSample(pool, count, seed) {
-  const rng = seededRandom(seed);
-  const copy = [...pool];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy.slice(0, count);
-}
-
 // Short beeps generated on the fly — no audio files to load or fail.
 function makeBeeper() {
   let ctx = null;
@@ -90,8 +58,13 @@ function makeBeeper() {
  *                                   Optional: without it a local line bank is used.
  * @param {Function} options.onFace  called with the expression Claude chose, so the
  *                                   Firekeeper elsewhere on the page can react too.
+ * @param {Function} options.onRename (fieldKey, value) when a player renames themselves.
  */
-export function createGame(root, config, { avatars = [], me = null, speak = null, onFace = null } = {}) {
+export function createGame(
+  root,
+  config,
+  { avatars = [], me = null, speak = null, onFace = null, onRename = null } = {},
+) {
   const beep = makeBeeper();
   const isTurnBased = config.mode === "claude" || config.mode === "friend";
   const opponent =
@@ -111,32 +84,23 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
   // --- deck ----------------------------------------------------------------
 
   /**
-   * Which pictures this game is played with — a property of the CONFIGURATION,
-   * not of the deal.
+   * The cast for this deal, drawn fresh from the set's bank every game.
    *
-   * This used to shuffle the pool and take the first N, so every press of "new
-   * game" dealt a different cast: you set up an ocean board with a turtle and a
-   * whale, pressed the button, and got a surfer and a coconut. Nothing in the
-   * config had changed, but it read as though the game had thrown your choices
-   * away — because from the player's side, the cards ARE the choices.
-   *
-   * So the cast is picked deterministically from the config. The same settings
-   * always summon the same creatures; a different board size or set summons a
-   * different cast. Only where they sit is random, which is the only part that
-   * has to be.
+   * Briefly made deterministic per config, on a misreading of "new game changes
+   * my setup" — that turned out to be the reset button, and a fixed cast made
+   * every round identical instead. Variety between rounds is the point: the bank
+   * is much larger than any board, so the same ocean board keeps producing
+   * different creatures without a single extra API call.
    */
   function faces(count) {
-    const seed = hash(`${config.cardSet}:${config.cols}x${config.rows}`);
-    const pick = (pool) => deterministicSample(pool, count, seed);
-
     if (config.cardSet === "avatars") {
-      return pick(avatars).map((a) => ({ type: "image", value: a.file }));
+      return shuffle(avatars).slice(0, count).map((a) => ({ type: "image", value: a.file }));
     }
     const pool =
       config.cardSet === "custom"
         ? config.customSymbols
         : (CARD_SETS[config.cardSet]?.symbols ?? []);
-    return pick(pool).map((s) => ({ type: "emoji", value: s }));
+    return shuffle(pool).slice(0, count).map((s) => ({ type: "emoji", value: s }));
   }
 
   function makePlayers() {
@@ -148,14 +112,15 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
     }
     if (config.mode === "friend") {
       return [
-        { name: "שחקן 1", avatar: null, emoji: "🔵", score: 0, isAI: false },
-        { name: "שחקן 2", avatar: null, emoji: "🔴", score: 0, isAI: false },
+        { name: config.player1Name || "שחקן 1", avatar: null, emoji: "🔵", score: 0, isAI: false, nameKey: "player1Name" },
+        { name: config.player2Name || "שחקן 2", avatar: null, emoji: "🔴", score: 0, isAI: false, nameKey: "player2Name" },
       ];
     }
     return [{ name: me?.name ?? "אני", avatar: me?.avatar ?? null, score: 0, isAI: false }];
   }
 
   function build() {
+    const players = makePlayers();
     const pairs = (config.cols * config.rows) / 2;
     const chosen = faces(pairs);
     const deck = shuffle(
@@ -168,7 +133,7 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
       deck,
       flipped: [],
       matched: new Set(),
-      players: makePlayers(),
+      players,
       current: 0,
       score: 0,
       secondsLeft: config.timerSeconds,
@@ -178,6 +143,23 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
       flipBackMs: config.flipBackMs,
       tickMs: 1000,
       saidLines: [],
+      /*
+        Every card ever turned face-up, by anyone.
+
+        Global on purpose: in a two-player game a card Claude revealed is a card
+        you watched. Judging your memory only on cards you turned yourself would
+        let you off for forgetting everything your opponent showed you, which is
+        most of the game.
+      */
+      seen: new Map(),
+      turnStart: null,
+      stats: players.map(() => ({
+        luckHits: 0,
+        luckExpected: 0,
+        luckEvents: 0,
+        knownChances: 0,
+        knownHits: 0,
+      })),
     };
   }
 
@@ -244,7 +226,26 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
       }
 
       const meta = el("div", "player__meta");
-      meta.append(el("div", "player__name", player.name));
+
+      /*
+        Two children sitting at one screen are not "שחקן 1" and "שחקן 2". Tapping
+        the name renames them — and because the name is a config field like every
+        other, it persists, travels in the share link, and the Firekeeper can set
+        it too ("תקרא לשחקן הראשון יואב").
+      */
+      if (player.nameKey && onRename) {
+        const name = el("button", "player__name player__name--editable", player.name);
+        name.type = "button";
+        name.title = "לחצו כדי לשנות את השם";
+        name.addEventListener("click", () => {
+          const next = prompt("מה השם?", player.name);
+          if (next && next.trim()) onRename(player.nameKey, next.trim().slice(0, 12));
+        });
+        meta.append(name);
+      } else {
+        meta.append(el("div", "player__name", player.name));
+      }
+
       meta.append(el("div", "player__score", String(player.score)));
 
       box.append(face, meta);
@@ -303,6 +304,86 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
 
   // --- play ----------------------------------------------------------------
 
+  const partnerOf = (card) =>
+    state.deck.find((c) => c.pairId === card.pairId && c.id !== card.id);
+
+  /** Unmatched cards nobody has turned over yet, excluding one. */
+  function unseenCount(excludeId) {
+    return state.deck.filter(
+      (c) => !state.matched.has(c.id) && c.id !== excludeId && !state.seen.has(c.id),
+    ).length;
+  }
+
+  /**
+   * Separate what a player KNEW from what they GUESSED.
+   *
+   * Two numbers come out of this, and the difference between them is the whole
+   * point — a child with a great memory and terrible luck played better than a
+   * child who got lucky, and until you measure both, the scoreboard cannot say so.
+   *
+   * 🧠 memory: at the moment you turned the first card, was its twin already
+   *    face-up in your history? If so the correct second card was fully
+   *    determined and no luck was involved. Getting it right is skill; getting it
+   *    wrong is forgetting. Turns where the twin was unknown are not counted at
+   *    all — you cannot fail to remember what you never saw.
+   *
+   * 🍀 luck: only when the twin was NOT known and you picked a card nobody had
+   *    seen. Then the chance of hitting was exactly 1/unseen. Summing those gives
+   *    the matches chance owed you; counting the real ones gives what you took.
+   */
+  function scoreTurn(first, second) {
+    const context = state.turnStart;
+    if (!context) return;
+    const stat = state.stats[context.player];
+    const matched = first.pairId === second.pairId;
+
+    if (context.partnerKnown) {
+      stat.knownChances += 1;
+      if (matched) stat.knownHits += 1;
+      return;
+    }
+
+    // Picking a card they had already seen is a decision, not a gamble — it tells
+    // us nothing about luck either way.
+    if (state.seen.has(second.id) || context.unseen <= 0) return;
+
+    stat.luckEvents += 1;
+    stat.luckExpected += 1 / context.unseen;
+    if (matched) stat.luckHits += 1;
+  }
+
+  /** What a player's two numbers mean, in words a ten-year-old can check. */
+  function readStats(index) {
+    const stat = state.stats[index];
+    const ratio = (stat.luckHits + 1) / (stat.luckExpected + 1);
+    const memory =
+      stat.knownChances > 0 ? Math.round((100 * stat.knownHits) / stat.knownChances) : null;
+
+    return {
+      luck: {
+        // Under a handful of gambles the ratio is noise, and telling a child they
+        // are blessed on the strength of two coin flips is worse than saying
+        // nothing.
+        enough: stat.luckEvents >= 5,
+        ratio,
+        label: stat.luckEvents < 5 ? "עוד מוקדם לדעת" : `פי ${ratio.toFixed(1)}`,
+        detail:
+          stat.luckEvents === 0
+            ? "עוד לא ניחשת אף קלף שלא הכרת."
+            : `מצאת ${stat.luckHits} זוגות בניחוש. לפי הסיכויים היית אמור/ה למצוא ${stat.luckExpected.toFixed(1)}.`,
+      },
+      memory: {
+        enough: stat.knownChances > 0,
+        percent: memory,
+        label: memory === null ? "—" : `${memory}%`,
+        detail:
+          stat.knownChances === 0
+            ? "עוד לא הפכת קלף שכבר ראית את התאום שלו."
+            : `${stat.knownChances} פעמים הפכת קלף שכבר ראית את התאום שלו. מצאת אותו ${stat.knownHits} פעמים.`,
+      },
+    };
+  }
+
   function onFlip(card, byAI) {
     if (destroyed || state.over || state.busy) return;
     if (state.flipped.length >= 2) return;
@@ -311,10 +392,23 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
     if (!byAI && activePlayer().isAI) return;
     if (!state.running && !isTurnBased) startTimer();
 
+    // Everything the scorer needs must be read BEFORE this card joins `seen`.
+    if (state.flipped.length === 0) {
+      const partner = partnerOf(card);
+      state.turnStart = {
+        player: state.current,
+        partnerKnown: partner ? state.seen.has(partner.id) : false,
+        unseen: unseenCount(card.id),
+      };
+    }
+
     state.flipped.push(card);
     cardEl(card.id)?.classList.add("is-flipped");
     opponent?.observe(card.id, card.pairId);
     if (config.sound) beep(520, 70, "triangle");
+
+    if (state.flipped.length === 2) scoreTurn(state.flipped[0], state.flipped[1]);
+    state.seen.set(card.id, card.pairId);
 
     if (state.flipped.length === 2) resolvePair();
   }
@@ -519,6 +613,8 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
       overlay.append(el("div", "overlay__score", `${state.score} נקודות`));
     }
 
+    if (config.showStats) overlay.append(renderStats());
+
     const again = el("button", "btn", "עוד פעם");
     again.type = "button";
     again.addEventListener("click", restart);
@@ -528,6 +624,57 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
       if (won) [660, 830, 990].forEach((f, i) => later(() => beep(f, 160), i * 140));
       else beep(140, 500, "sawtooth");
     }
+  }
+
+  /**
+   * The scoreboard: one row per player, two tappable chips each.
+   *
+   * Tappable rather than always-expanded because the number is the hook and the
+   * arithmetic is the lesson — a child looks at "פי 2.4", wants to know why, and
+   * finds a sentence they can check against the game they just played.
+   */
+  function renderStats() {
+    const box = el("div", "scores");
+    const detail = el("div", "scores__detail");
+
+    state.players.forEach((player, i) => {
+      const read = readStats(i);
+      const row = el("div", "scores__row");
+      if (state.players.length > 1) row.append(el("div", "scores__who", player.name));
+
+      for (const [kind, icon, data] of [
+        ["luck", "🍀", read.luck],
+        ["memory", "🧠", read.memory],
+      ]) {
+        const chip = el("button", `scores__chip scores__chip--${kind}`);
+        chip.type = "button";
+        chip.append(el("span", "scores__icon", icon));
+        chip.append(el("span", "scores__value", data.label));
+        chip.addEventListener("click", () => {
+          const same = detail.dataset.open === `${String(i)}:${kind}`;
+          for (const other of box.querySelectorAll(".scores__chip")) {
+            other.classList.remove("is-open");
+          }
+          if (same) {
+            detail.dataset.open = "";
+            detail.textContent = "";
+            detail.classList.remove("is-open");
+            return;
+          }
+          chip.classList.add("is-open");
+          detail.dataset.open = `${String(i)}:${kind}`;
+          detail.textContent =
+            `${icon} ${kind === "luck" ? "מזל" : "זיכרון"} — ${player.name}
+${data.detail}`;
+          detail.classList.add("is-open");
+        });
+        row.append(chip);
+      }
+      box.append(row);
+    });
+
+    box.append(detail);
+    return box;
   }
 
   function peek() {

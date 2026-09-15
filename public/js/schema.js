@@ -30,44 +30,37 @@ export const CARD_SETS = {
   fruit: {
     label: "פירות",
     kind: "emoji",
-    symbols: [..."🍎🍌🍇🍓🍉🍊🍋🍒🥝🍍🥥🥭🍑🍐🍈🥑🍅🥕🌽🥦🥬🥒🧄🧅🥔🍠🥜🌰🍄🫒🌶🫐"],
+    symbols: [..."🍎🍌🍇🍓🍉🍊🍋🍒🥝🍍🥥🥭🍑🍐🍈🥑🍅🥕🌽🥦🥬🥒🧄🧅🥔🍠🥜🌰🍄🫒🌶🫐🫑🍆🫘🍏🌻🌷🌹🌺🌼🌸💐🍀🌱🌳🌵🪴"],
   },
   animals: {
     label: "חיות",
     kind: "emoji",
-    symbols: [..."🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🦉🦄🐴🐝🦋🐢🐬🐳🦈🐙🦀🦩🦜🐧🦖🦕🐞"],
+    symbols: [..."🐶🐱🐭🐹🐰🦊🐻🐼🐨🐯🦁🐮🐷🐸🐵🦉🦄🐴🐝🦋🐢🐬🐳🦈🐙🦀🦩🦜🐧🦖🦕🐞🦔🦦🦥🦨🦡🐿🦫🦘🦒🦓🦌🐄🐖🐑🦙🐈"],
   },
   space: {
     label: "חלל",
     kind: "emoji",
-    // Two rules, both learned by measuring rather than guessing:
-    // 1. trimmed from nine near-identical round bodies (🌑🌓🌕🌗🌚🌝🌙🌛🌍) to two;
-    // 2. no characters that default to TEXT presentation (🛰 ☄ ⚙ ❄ ⛸ and friends).
-    //    Those render as flat grey line glyphs instead of colour emoji, so they all
-    //    look alike at 39px — the size a card actually is on a phone.
-    symbols: [..."🚀🛸👽🌍🌙⭐🪐🔭🌌🌠🌞💫🌟🌑🌈🪨🤖👾🧊🌋🗿🔥⚡💎🔋🧪🚨🔮🎇🧲🎮🎨"],
+    symbols: [..."🚀🛸👽🌍🌙⭐🪐🔭🌌🌠🌞💫🌟🌑🌈🪨🤖👾🧊🌋🗿🔥⚡💎🔋🧪🚨🔮🎇🧲🎮🎨🧬🛢🪞🧫🔩🗼🎠🎡🎢🪁🎯🧸🪄🔱🎆🌡"],
   },
   sport: {
     label: "ספורט",
     kind: "emoji",
-    // Four medals (🥇🥈🥉🏅) and six balls were too many of the same silhouette.
-    // ⚾ and 🏐 in particular are both white spheres.
-    symbols: [..."⚽🏀🏈🎾🏐🏉🥏🎱🏓🏸🥊🥋⛳🏹🛹🛼🎿🏂🏆🥇🎯🎳🪀🎣🤿🚲🛷🎽🏒🥅🪂🥌"],
+    symbols: [..."⚽🏀🏈🎾🏐🏉🥏🎱🏓🏸🥊🥋⛳🏹🛹🛼🎿🏂🏆🥇🎯🎳🪀🎣🤿🚲🛷🎽🏒🥅🪂🥌🤼🤹🧗🚣🧘🤽🏇🥍🪃🤸🏊🎖🏵🎗🎫🎟"],
   },
   food: {
     label: "אוכל",
     kind: "emoji",
-    symbols: [..."🍕🍔🍟🌭🥪🌮🌯🥙🧆🥗🍝🍜🍲🍛🍣🍱🥟🍤🍙🍚🍘🥠🍢🍡🍧🍨🍦🥧🧁🍰🎂🍩"],
+    symbols: [..."🍕🍔🍟🌭🥪🌮🌯🥙🧆🥗🍝🍜🍲🍛🍣🍱🥟🍤🍙🍚🍘🥠🍢🥘🫕🍥🥣🧂🫔🥫🫓🍞🥐🥨🥯🧈🍯🥞🧇🥓🍗🍖🧀🥚🍿🥖🌶🥜"],
   },
   sweets: {
     label: "ממתקים",
     kind: "emoji",
-    symbols: ["🍬","🍭","🍫","🍩","🧁","🍰","🎂","🍦","🍨","🍧","🥧","🍪","🍮","🍯","🥞","🧇","🍓","🍒","🥐","🥨","🍡","🍢","🍿","🥤","🧃","🍹","🍎","🍇","🍑","🍉","🥜","🌰"],
+    symbols: [..."🍬🍭🍫🍩🧁🍰🎂🍦🍨🍧🥧🍪🍮🍯🍓🍒🍡🍿🥤🧃🍹🍇🍑🍉🥮🍘🍥🥠🧋🍵☕🫖🍶🥛🧉🍼🎈🎁🎀🧸🪅🍾🥂🧊🍋🍏🎊🎉"],
   },
   ocean: {
     label: "ים",
     kind: "emoji",
-    symbols: ["🐠","🐟","🐡","🦈","🐬","🐳","🐙","🦑","🦐","🦀","🐚","🌊","⛵","🚤","🏄","🐢","🦭","🐋","🦞","🐊","⚓","🦩","🐧","🍤","🥥","🩴","🤿","🚢","🌴","🪸","🪼","🧊"],
+    symbols: [..."🐠🐟🐡🦈🐬🐳🐙🦑🦐🦀🐚🌊⛵🚤🏄🐢🦭🐋🦞🐊⚓🦩🐧🍤🥥🩴🤿🚢🌴🪸🪼🧊🦆🦢🪝🧭🗺🏝🌅🌄🪵🍹⛱🛟🐌🫧🏖🚁"],
   },
   custom: { label: "משלי (אני בוחר/ת)", kind: "emoji" },
 };
@@ -101,6 +94,22 @@ export const FIELDS = [
     ],
     label: "כמה קלוד טוב",
     help: "כמה מהקלפים שקלוד ראה הוא באמת זוכר. פועל רק במשחק נגד קלוד.",
+  },
+  {
+    key: "player1Name",
+    type: "string",
+    group: "mode",
+    maxLength: 12,
+    label: "שם שחקן 1",
+    help: "מי משחק ראשון. פועל במשחק נגד חבר/ה.",
+  },
+  {
+    key: "player2Name",
+    type: "string",
+    group: "mode",
+    maxLength: 12,
+    label: "שם שחקן 2",
+    help: "מי משחק שני. פועל במשחק נגד חבר/ה.",
   },
   {
     key: "claudeTalks",
@@ -217,6 +226,13 @@ export const FIELDS = [
     help: "נקודה נוספת על כל שנייה שנשארה בסוף.",
   },
   {
+    key: "showStats",
+    type: "bool",
+    group: "score",
+    label: "להראות מזל וזיכרון בסוף",
+    help: "בסוף כל משחק — כמה בר מזל היית, וכמה פעמים זכרת קלף שכבר ראית.",
+  },
+  {
     key: "theme",
     type: "enum",
     group: "look",
@@ -321,6 +337,8 @@ export const GROUPS = [
 export const STARTER_CONFIG = Object.freeze({
   mode: "solo",
   claudeSkill: "normal",
+  player1Name: "שחקן 1",
+  player2Name: "שחקן 2",
   claudeTalks: true,
   title: "משחק זיכרון",
   cols: 4,
@@ -334,6 +352,7 @@ export const STARTER_CONFIG = Object.freeze({
   pointsPerMatch: 10,
   penaltyPerMiss: 0,
   speedBonus: false,
+  showStats: true,
   theme: "plain",
   showTimer: true,
   showScore: false,

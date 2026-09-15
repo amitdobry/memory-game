@@ -61,6 +61,7 @@ function renderGame() {
     me: { name: user.name, avatar: user.avatar },
     speak: requestBanter,
     onFace: (face) => keeper.face(face),
+    onRename: (key, value) => applyConfig({ ...config, [key]: value }),
   });
   document.title = config.title;
 }
