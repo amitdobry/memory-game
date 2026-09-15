@@ -25,13 +25,27 @@ import { CONTRACT_VERSION } from "./contract.js";
  * is hosted separately (GitHub Pages), and add that Pages origin to LIVE's
  * LIVE_ALLOWED_ORIGINS or the browser will block the call.
  */
+/** LIVE on Heroku — the only place the Anthropic key exists. */
+const PRODUCTION_API = "https://live-intelligence-f6ec7b9df867.herokuapp.com";
+
 export const API_BASE = resolveBase();
 
 function resolveBase() {
+  const host = location.hostname;
+
   // Local development: the static site on :3000, LIVE on :4300.
-  if (location.port === "3000") return "http://localhost:4300";
-  // Served by LIVE, or configured at build time.
-  return "";
+  if (host === "localhost" || host === "127.0.0.1") {
+    return location.port === "4300" ? "" : "http://localhost:4300";
+  }
+
+  // Workshop day on a laptop: the room connects over the LAN by IP and LIVE is on
+  // the same machine. Same host, the other port.
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return `http://${host}:4300`;
+
+  // Anywhere else — GitHub Pages — LIVE is the deployed app. Its origin must also
+  // appear in LIVE_ALLOWED_ORIGINS, or the browser blocks the call before it is
+  // ever sent and the failure looks like a bug in this file.
+  return PRODUCTION_API;
 }
 
 const CODE_KEY = "workshop:code";
