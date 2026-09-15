@@ -23,6 +23,38 @@ const shuffle = (arr) => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** A small, stable string hash — enough to turn a config into a seed. */
+function hash(text) {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** mulberry32 — tiny, seeded, and good enough to choose a cast of cards. */
+function seededRandom(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** The same pool and seed always yield the same picks, in the same order. */
+function deterministicSample(pool, count, seed) {
+  const rng = seededRandom(seed);
+  const copy = [...pool];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, count);
+}
+
 // Short beeps generated on the fly — no audio files to load or fail.
 function makeBeeper() {
   let ctx = null;
@@ -78,15 +110,33 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
 
   // --- deck ----------------------------------------------------------------
 
+  /**
+   * Which pictures this game is played with — a property of the CONFIGURATION,
+   * not of the deal.
+   *
+   * This used to shuffle the pool and take the first N, so every press of "new
+   * game" dealt a different cast: you set up an ocean board with a turtle and a
+   * whale, pressed the button, and got a surfer and a coconut. Nothing in the
+   * config had changed, but it read as though the game had thrown your choices
+   * away — because from the player's side, the cards ARE the choices.
+   *
+   * So the cast is picked deterministically from the config. The same settings
+   * always summon the same creatures; a different board size or set summons a
+   * different cast. Only where they sit is random, which is the only part that
+   * has to be.
+   */
   function faces(count) {
+    const seed = hash(`${config.cardSet}:${config.cols}x${config.rows}`);
+    const pick = (pool) => deterministicSample(pool, count, seed);
+
     if (config.cardSet === "avatars") {
-      return shuffle(avatars).slice(0, count).map((a) => ({ type: "image", value: a.file }));
+      return pick(avatars).map((a) => ({ type: "image", value: a.file }));
     }
     const pool =
       config.cardSet === "custom"
         ? config.customSymbols
         : (CARD_SETS[config.cardSet]?.symbols ?? []);
-    return shuffle(pool).slice(0, count).map((s) => ({ type: "emoji", value: s }));
+    return pick(pool).map((s) => ({ type: "emoji", value: s }));
   }
 
   function makePlayers() {
