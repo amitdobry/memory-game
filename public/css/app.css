@@ -791,24 +791,88 @@ dialog.share::backdrop {
 }
 
 @media (max-width: 860px) {
+  /*
+    On a phone the app owns the viewport and nothing scrolls the page.
+
+    The first version let the document grow: board, then chat log, then — far below
+    the fold — the thing you type into. A child had to scroll past their whole game
+    to say anything to the Firekeeper, which is the one action the app exists for.
+    So the two halves split the screen and each scrolls inside itself.
+  */
   .shell {
-    height: auto;
-    min-height: 100dvh;
+    height: 100dvh;
+    overflow: hidden;
   }
   .workbench {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(360px, 60vh);
-    overflow: visible;
+    /* minmax(0, ...) on both: without the 0 floor, a grid row refuses to shrink
+       below its content and the board pushes the chat off-screen again. */
+    grid-template-rows: minmax(0, 1fr) minmax(0, 46%);
+    overflow: hidden;
   }
   .workbench__side {
     border-inline-start: 0;
     border-top: 1px solid var(--shell-line);
   }
   .workbench__stage {
-    padding: 0.7rem;
+    padding: 0.6rem;
+    align-items: center;
   }
   .game {
-    padding: 0.85rem;
+    padding: 0.7rem;
+  }
+  /* The board is now height-bound, not width-bound: it must fit the space left
+     over, however many columns the child asked for. */
+  .board {
+    max-width: min(100%, calc(var(--cols) * 64px));
+  }
+  .game__header {
+    margin-bottom: 0.6rem;
+    gap: 0.5rem;
+  }
+  .game__title {
+    font-size: 1.05rem;
+  }
+  .game__footer {
+    margin-top: 0.6rem;
+  }
+
+  /* Suggestion chips cost a whole row of a small screen; the input matters more. */
+  .chat__ideas {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    scrollbar-width: none;
+  }
+  .idea {
+    flex: none;
+  }
+
+  /* The top bar is four buttons wide on a desktop and two rows on a phone. */
+  .topbar {
+    padding: 0.5rem 0.7rem;
+    gap: 0.5rem;
+  }
+  .topbar__actions {
+    gap: 0.35rem;
+  }
+  .topbar__actions .btn {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* A short phone in landscape has no room for both halves at once. */
+@media (max-height: 520px) and (max-width: 860px) {
+  .workbench {
+    grid-template-rows: minmax(0, 1fr) minmax(0, 60%);
+  }
+  .keeper {
+    padding: 0.5rem 0.7rem;
+  }
+  .keeper__portrait {
+    width: 38px;
+    height: 38px;
   }
 }
 
