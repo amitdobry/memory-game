@@ -7,24 +7,18 @@
 //
 // Two things travel with each request:
 //
-//   the code     — a workshop ticket, remembered per browser. It is visible in
-//                  devtools and is NOT a secret; what makes that safe is that the
-//                  endpoint only ever returns a game config and one short sentence.
-//                  See src/web/workshopRoutes.ts in LIVE for the full argument.
+//   the grant    — proof that someone opened a door: the owner's password, an
+//                  eight-digit code, or the owner approving by email. It lives in
+//                  this browser and is visible to whoever holds the phone, which is
+//                  fine — it expires, it is rate-limited, and the endpoint behind it
+//                  only ever returns a game config and one short sentence. The full
+//                  argument is in LIVE's src/workshop/access.ts.
 //   the contract — a stamp of the field list this app was built against, so the
 //                  server can say when one of the two is stale instead of quietly
 //                  setting a field the game no longer has.
 // ---------------------------------------------------------------------------
 import { CONTRACT_VERSION } from "./contract.js";
 
-/**
- * Where the AI lives.
- *
- * Empty means "the same origin as this page", which is what you want when the
- * workshop site is served by LIVE itself. Point it at LIVE's origin when the site
- * is hosted separately (GitHub Pages), and add that Pages origin to LIVE's
- * LIVE_ALLOWED_ORIGINS or the browser will block the call.
- */
 /** LIVE on Heroku — the only place the Anthropic key exists. */
 const PRODUCTION_API = "https://live-intelligence-f6ec7b9df867.herokuapp.com";
 
@@ -48,49 +42,83 @@ function resolveBase() {
   return PRODUCTION_API;
 }
 
-const CODE_KEY = "workshop:code";
+const GRANT_KEY = "workshop:grant";
 
-export function getCode() {
-  // A link like  ...?t=ABC123  saves the code, so a child never types it.
-  const fromUrl = new URLSearchParams(location.search).get("t");
-  if (fromUrl) {
-    setCode(fromUrl);
-    return fromUrl.trim().toUpperCase();
-  }
+/** The grant this browser is holding, or null when there is none worth sending. */
+export function getGrant() {
   try {
-    return localStorage.getItem(CODE_KEY) ?? "";
+    const raw = localStorage.getItem(GRANT_KEY);
+    if (!raw) return null;
+    const grant = JSON.parse(raw);
+    // An expired grant is worse than none: it produces a confusing 403 instead of
+    // simply asking the child for the password again.
+    if (!grant?.token || (grant.expiresAt && grant.expiresAt < Date.now())) {
+      localStorage.removeItem(GRANT_KEY);
+      return null;
+    }
+    return grant;
   } catch {
-    return "";
+    return null;
   }
 }
 
-export function setCode(code) {
+export function setGrant(grant) {
   try {
-    localStorage.setItem(CODE_KEY, String(code).trim().toUpperCase());
+    localStorage.setItem(GRANT_KEY, JSON.stringify(grant));
   } catch {
-    /* a browser with storage blocked still plays; it just re-asks for the code */
+    /* a browser with storage blocked just asks for the password again */
+  }
+}
+
+export function clearGrant() {
+  try {
+    localStorage.removeItem(GRANT_KEY);
+  } catch {
+    /* ignore */
   }
 }
 
 async function post(route, payload) {
-  const response = await fetch(`${API_BASE}/api/workshop/${route}`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-workshop-code": getCode(),
-    },
-    body: JSON.stringify({ ...payload, contract: CONTRACT_VERSION }),
-  });
+  /*
+    A network failure throws a TypeError whose message is the browser's own
+    "Failed to fetch" — in English, to a ten-year-old, in the Firekeeper's voice.
+    Every throw out of this function carries Hebrew a child can act on.
+  */
+  let response;
+  try {
+    response = await fetch(`${API_BASE}/api/workshop/${route}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-workshop-access": getGrant()?.token ?? "",
+      },
+      body: JSON.stringify({ ...payload, contract: CONTRACT_VERSION }),
+    });
+  } catch {
+    const offline = new Error("אין לי חיבור לאינטרנט כרגע. תבדקו את החיבור ותנסו שוב.");
+    offline.status = 0;
+    throw offline;
+  }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data.error ?? "שגיאה");
+    const error = new Error(data.error ?? "משהו השתבש. תנסו שוב.");
     error.status = response.status;
     throw error;
   }
   if (data.contractWarning) {
     console.warn("[workshop] contract mismatch —", data.contractWarning);
   }
+  return data;
+}
+
+/**
+ * Try a password. Accepts either the owner's permanent one or a minted eight-digit
+ * code — the server knows the difference, and a child does not need to.
+ */
+export async function unlock(password) {
+  const data = await post("unlock", { password });
+  setGrant({ token: data.token, expiresAt: data.expiresAt, owner: Boolean(data.owner) });
   return data;
 }
 

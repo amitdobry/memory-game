@@ -6,7 +6,7 @@
 // every path is saved, undoable and visible in the code tab.
 // ---------------------------------------------------------------------------
 import { createGame } from "./game.js";
-import { requestChange, requestBanter, getCode, setCode } from "./api.js";
+import { requestChange, requestBanter, unlock, getGrant, clearGrant } from "./api.js";
 import { createFirekeeper, runOnboarding } from "./firekeeper.js";
 import { userById } from "./users.js";
 import {
@@ -44,6 +44,9 @@ let config = loadConfig(user.id);
 let lastChanges = [];
 let game = null;
 const chatHistory = [];
+
+// Declared up here because the intro reads it before the door section runs.
+let locked = getGrant() === null;
 
 const gameRoot = document.getElementById("game");
 const log = document.getElementById("log");
@@ -101,6 +104,7 @@ for (const tab of document.querySelectorAll(".tab")) {
 const form = document.getElementById("form");
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
+const passwordInput = document.getElementById("password");
 
 const IDEAS = [
   "תעשה לי לוח 6 על 6",
@@ -188,8 +192,14 @@ async function showIntro() {
   } catch {
     /* a browser with storage blocked simply sees the intro again */
   }
-  keeper.face("warm");
-  keeper.say(`קדימה ${user.name} — מה נשנה קודם?`);
+  // The intro ends where the child actually is: at the door if it is still shut,
+  // at the game if it is already open. Otherwise its closing line overwrites the
+  // password prompt and the child is told to start typing wishes at a locked app.
+  if (locked) askForPassword();
+  else {
+    keeper.face("warm");
+    keeper.say(`קדימה ${user.name} — מה נשנה קודם?`);
+  }
   input.focus();
 }
 
@@ -203,6 +213,19 @@ try {
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  // A password is not chat: it is never echoed into the log, never kept in the
+  // history that later travels to the model, and never left sitting in the field.
+  if (locked) {
+    const secret = passwordInput.value.trim();
+    if (!secret) return;
+    passwordInput.value = "";
+    sendBtn.disabled = true;
+    await handleLocked(secret);
+    sendBtn.disabled = false;
+    if (locked) passwordInput.focus();
+    return;
+  }
+
   const message = input.value.trim();
   if (!message) return;
 
@@ -239,10 +262,9 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     typing.remove();
     if (error.status === 401 || error.status === 403) {
-      keeper.face("concerned");
-      keeper.say(error.message);
+      clearGrant();
       addMessage("error", error.message);
-      askForCode();
+      askForPassword();
     } else {
       keeper.face("concerned");
       const trouble = error.message ?? "לא הצלחתי להגיע ל-AI. אולי אין אינטרנט? תנסו שוב.";
@@ -475,16 +497,53 @@ async function drawQR(url) {
 }
 
 // ===========================================================================
-// 5. Workshop code
+// 5. The door
 //
-// Only asked for when the server is actually gated (the hosted setup). On a
-// laptop on the LAN the server runs open and this never appears.
+// There is no login screen. The Firekeeper simply asks for the password in the
+// same box the child will use for everything else, and the first thing they type
+// goes to /unlock instead of to the AI.
+//
+// That is the whole design: a ten-year-old who has just been told "type what you
+// want and it happens" should not first meet a form. They meet a character who
+// asks them a question.
 // ===========================================================================
 
-function askForCode() {
-  const entered = prompt("הכניסו את קוד הסדנה שקיבלתם מהמדריך:", getCode());
-  if (entered) {
-    setCode(entered);
-    addMessage("system", "הקוד נשמר. אפשר לנסות שוב.");
-  }
+function askForPassword() {
+  locked = true;
+  keeper.face("ambient");
+  keeper.say("לפני שמתחילים — מה הסיסמה?");
+  input.hidden = true;
+  passwordInput.hidden = false;
+  passwordInput.value = "";
+  passwordInput.focus();
 }
+
+function opened() {
+  locked = false;
+  passwordInput.hidden = true;
+  passwordInput.value = "";
+  input.hidden = false;
+  keeper.face("warm");
+  keeper.say(`נכנסת! מה נשנה במשחק, ${user.name}?`);
+  input.focus();
+}
+
+/** @returns true when the message was a password attempt and is now handled. */
+async function handleLocked(message) {
+  if (!locked) return false;
+
+  try {
+    await unlock(message);
+    addMessage("system", "הסיסמה התקבלה. אפשר להתחיל.");
+    opened();
+  } catch (error) {
+    keeper.face("concerned");
+    const why = error.message ?? "הסיסמה לא נכונה.";
+    keeper.say(why);
+    addMessage("error", why);
+  }
+  return true;
+}
+
+if (locked) askForPassword();
+else opened();

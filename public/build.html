@@ -45,6 +45,16 @@
             <div class="chat__log" id="log"></div>
             <div class="chat__ideas" id="ideas"></div>
             <form class="chat__form" id="form">
+              <!-- A textarea has no type, so it cannot be made to mask a password.
+                   The door gets a real password field that swaps in while locked. -->
+              <input
+                class="chat__input"
+                id="password"
+                type="password"
+                placeholder="הסיסמה כאן"
+                autocomplete="off"
+                hidden
+              />
               <textarea
                 class="chat__input"
                 id="input"
