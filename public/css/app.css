@@ -247,7 +247,7 @@ button {
 
 .chat {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto 1fr auto auto;
   height: 100%;
   overflow: hidden;
   padding: 0;
@@ -903,4 +903,140 @@ dialog.share::backdrop {
   left: calc(50% - 6px);
   border: 6px solid transparent;
   border-bottom-color: #fff;
+}
+
+
+/* ==========================================================================
+   5. שומר המדורה — the Firekeeper
+   ========================================================================== */
+
+.keeper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 0.9rem;
+  border-bottom: 1px solid var(--shell-line);
+  background: linear-gradient(180deg, #fff8f0 0%, #ffffff 100%);
+}
+.keeper__portrait {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 50%;
+  background: #fff3e2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.keeper__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+/* A short flare when his expression changes, so a reaction is felt, not just seen. */
+.keeper__portrait.is-reacting {
+  animation: flare 0.45s ease;
+}
+@keyframes flare {
+  35% {
+    transform: scale(1.12) rotate(-3deg);
+    box-shadow: 0 0 0 6px rgba(255, 153, 51, 0.22);
+  }
+}
+.keeper__bubble {
+  flex: 1;
+  min-width: 0;
+}
+.keeper__name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #c2700f;
+  text-transform: uppercase;
+  margin-bottom: 0.15rem;
+}
+.keeper__line {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: var(--shell-ink);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- the intro ----------------------------------------------------- */
+
+dialog.intro {
+  border: 0;
+  border-radius: 22px;
+  padding: 1.8rem 1.6rem 1.4rem;
+  box-shadow: var(--shadow-lg);
+  max-width: 460px;
+  width: calc(100% - 2rem);
+  text-align: center;
+  background: linear-gradient(180deg, #fff8f0 0%, #ffffff 60%);
+}
+dialog.intro::backdrop {
+  background: rgba(16, 24, 40, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.keeper--big {
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 0;
+  background: none;
+  padding: 0;
+  text-align: center;
+}
+.keeper--big .keeper__portrait {
+  width: 150px;
+  height: 150px;
+}
+.keeper--big .keeper__name {
+  font-size: 0.78rem;
+}
+.keeper--big .keeper__line {
+  font-size: 1.12rem;
+  line-height: 1.6;
+  min-height: 5.5rem;
+}
+
+.intro__dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin: 1.1rem 0 1.2rem;
+}
+.intro__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #e5d3bd;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.intro__dot.is-on {
+  background: #f0900f;
+  transform: scale(1.35);
+}
+.intro__controls {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  align-items: center;
+}
+.intro__controls .btn {
+  min-width: 96px;
+}
+
+@media (max-width: 860px) {
+  .keeper__portrait {
+    width: 46px;
+    height: 46px;
+  }
+  .keeper--big .keeper__portrait {
+    width: 118px;
+    height: 118px;
+  }
 }

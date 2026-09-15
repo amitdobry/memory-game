@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 import { createGame } from "./game.js";
 import { requestChange, requestBanter, getCode, setCode } from "./api.js";
+import { createFirekeeper, runOnboarding } from "./firekeeper.js";
 import { userById } from "./users.js";
 import {
   FIELDS,
@@ -47,12 +48,17 @@ const chatHistory = [];
 const gameRoot = document.getElementById("game");
 const log = document.getElementById("log");
 
+// The host of the whole session. Everything the AI says comes out of his mouth.
+const keeper = createFirekeeper(document.getElementById("keeper"));
+keeper.say(`היי ${user.name}! מה נשנה במשחק?`);
+
 function renderGame() {
   game?.destroy();
   game = createGame(gameRoot, config, {
     avatars,
     me: { name: user.name, avatar: user.avatar },
     speak: requestBanter,
+    onFace: (face) => keeper.face(face),
   });
   document.title = config.title;
 }
@@ -165,10 +171,35 @@ function addChangeList(node, changes) {
   log.scrollTop = log.scrollHeight;
 }
 
-addMessage(
-  "system",
-  "כתבו לי מה לשנות במשחק, בעברית רגילה. אחרי כל שינוי — תשחקו ותבדקו שזה באמת מה שביקשתם.",
-);
+/*
+  First visit gets the intro; after that he just waits.
+
+  Kept per child rather than per browser, so two children sharing a laptop each get
+  their own first time — and so an instructor can replay it from the top bar.
+*/
+const INTRO_KEY = `workshop:intro:${user.id}`;
+
+async function showIntro() {
+  await runOnboarding(document.body, {
+    onStep: (_, step) => keeper.face(step.face),
+  });
+  try {
+    localStorage.setItem(INTRO_KEY, "done");
+  } catch {
+    /* a browser with storage blocked simply sees the intro again */
+  }
+  keeper.face("warm");
+  keeper.say(`קדימה ${user.name} — מה נשנה קודם?`);
+  input.focus();
+}
+
+document.getElementById("help").addEventListener("click", showIntro);
+
+try {
+  if (!localStorage.getItem(INTRO_KEY)) showIntro();
+} catch {
+  /* ignore */
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -180,6 +211,9 @@ form.addEventListener("submit", async (event) => {
   input.style.height = "auto";
   sendBtn.disabled = true;
 
+  keeper.face("ambient");
+  keeper.say("רגע, חושב…");
+
   const typing = document.createElement("div");
   typing.className = "typing";
   typing.innerHTML = "<span></span><span></span><span></span>";
@@ -190,6 +224,8 @@ form.addEventListener("submit", async (event) => {
     const data = await requestChange({ message, config, history: chatHistory.slice(-12) });
     typing.remove();
 
+    keeper.face(data.face);
+    keeper.say(data.reply);
     const bubble = addMessage("ai", data.reply);
     chatHistory.push({ role: "user", content: message });
     chatHistory.push({ role: "assistant", content: data.reply });
@@ -203,10 +239,15 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     typing.remove();
     if (error.status === 401 || error.status === 403) {
+      keeper.face("concerned");
+      keeper.say(error.message);
       addMessage("error", error.message);
       askForCode();
     } else {
-      addMessage("error", error.message ?? "לא הצלחתי להגיע ל-AI. אולי אין אינטרנט? תנסו שוב.");
+      keeper.face("concerned");
+      const trouble = error.message ?? "לא הצלחתי להגיע ל-AI. אולי אין אינטרנט? תנסו שוב.";
+      keeper.say(trouble);
+      addMessage("error", trouble);
     }
   } finally {
     sendBtn.disabled = false;

@@ -17,7 +17,14 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { FIELDS, STARTER_CONFIG, CARD_SETS, THEME_CARD_SET } from "../public/js/schema.js";
+import {
+  FIELDS,
+  STARTER_CONFIG,
+  CARD_SETS,
+  THEME_CARD_SET,
+  FIREKEEPER_FACES,
+  DEFAULT_FACE,
+} from "../public/js/schema.js";
 
 const target = process.argv[2] ?? "C:/Users/Admin/Live/src/workshop/contract.ts";
 
@@ -37,7 +44,14 @@ const fields = FIELDS.map((f) => ({
 }));
 
 const version = createHash("sha256")
-  .update(JSON.stringify({ fields, starter: STARTER_CONFIG, themes: THEME_CARD_SET }))
+  .update(
+    JSON.stringify({
+      fields,
+      starter: STARTER_CONFIG,
+      themes: THEME_CARD_SET,
+      faces: FIREKEEPER_FACES,
+    }),
+  )
   .digest("hex")
   .slice(0, 12);
 
@@ -99,6 +113,15 @@ export const CARD_SETS: Readonly<Record<string, { label: string; symbolCount: nu
  * null means the theme has no natural card set and the cards are left alone.
  */
 export const THEME_CARD_SET: Readonly<Record<string, string | null>> = ${JSON.stringify(THEME_CARD_SET, null, 2)};
+
+/**
+ * שומר המדורה — the Firekeeper's four expressions, described for the model that has
+ * to pick between them. Sent with every prompt; the chosen name comes back as
+ * \`face\` on the answer, so the character reacts to what actually happened.
+ */
+export const FIREKEEPER_FACES: Readonly<Record<string, string>> = ${JSON.stringify(FIREKEEPER_FACES, null, 2)};
+
+export const DEFAULT_FACE = ${JSON.stringify(DEFAULT_FACE)};
 
 export const AVATAR_COUNT = ${
   (await fs.readFile(new URL("../public/avatars/manifest.json", import.meta.url), "utf8").then(

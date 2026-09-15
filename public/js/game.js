@@ -54,10 +54,12 @@ function makeBeeper() {
  * @param {object} options
  * @param {Array}  options.avatars   the avatar manifest
  * @param {object} options.me        {name, avatar} of the child who owns this game
- * @param {Function} options.speak   async (event) => string — Claude's voice.
+ * @param {Function} options.speak   async (event) => {line, face} — Claude's voice.
  *                                   Optional: without it a local line bank is used.
+ * @param {Function} options.onFace  called with the expression Claude chose, so the
+ *                                   Firekeeper elsewhere on the page can react too.
  */
-export function createGame(root, config, { avatars = [], me = null, speak = null } = {}) {
+export function createGame(root, config, { avatars = [], me = null, speak = null, onFace = null } = {}) {
   const beep = makeBeeper();
   const isTurnBased = config.mode === "claude" || config.mode === "friend";
   const opponent =
@@ -381,10 +383,11 @@ export function createGame(root, config, { avatars = [], me = null, speak = null
             ? "הילד בדיוק מצא זוג."
             : "הילד בדיוק פספס, והתור עובר אליך.");
 
-      const line = await speak({ event, recent: state.saidLines });
+      const { line, face } = await speak({ event, recent: state.saidLines });
       if (!destroyed && line) {
         state.saidLines.push(line);
         bubble(line);
+        if (face) onFace?.(face);
         clearTimeout(bubbleTimer);
         bubbleTimer = later(() => bubble(""), 4500);
       }

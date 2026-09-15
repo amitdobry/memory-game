@@ -14,6 +14,7 @@
         <span class="topbar__who" id="who"></span>
         <span class="topbar__spacer"></span>
         <div class="topbar__actions">
+          <button class="btn btn--ghost btn--small" id="help" type="button">מה עושים כאן?</button>
           <button class="btn btn--ghost btn--small" id="undo" type="button">בטל שינוי אחרון</button>
           <button class="btn btn--ghost btn--small" id="reset" type="button">להתחיל מהתחלה</button>
           <button class="btn btn--small" id="share" type="button">שיתוף המשחק</button>
@@ -40,6 +41,7 @@
 
           <!-- AI chat -->
           <section class="panel chat" id="panel-chat" role="tabpanel">
+            <div id="keeper"></div>
             <div class="chat__log" id="log"></div>
             <div class="chat__ideas" id="ideas"></div>
             <form class="chat__form" id="form">

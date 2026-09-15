@@ -277,6 +277,27 @@ export const THEME_CARD_SET = {
   sunset: null,
 };
 
+
+/**
+ * שומר המדורה — the Firekeeper. The face the children actually talk to.
+ *
+ * The AI picks one of these on every answer, so the character reacts to what just
+ * happened instead of staring blankly: proud when a child's idea lands, apologetic
+ * when it has to say no, cheeky when it has just beaten them to a pair.
+ *
+ * Four faces and no more. The descriptions are sent to the model verbatim, so they
+ * are written for it to choose between, not for a designer to admire.
+ */
+export const FIREKEEPER_FACES = {
+  warm: "חם ומחייך — כשהכל עבד, כשהילד הצליח, וכשאתה מברך אותו",
+  winking: "קורץ ושובב — כשאתה מתגרה בו בכיף, או מתגאה שניצחת אותו בתור",
+  concerned: "מודאג — כשאתה לא יכול לעשות מה שביקש, כשמשהו לא הסתדר, או כשהיית צריך לשנות את הבקשה שלו",
+  ambient: "רגוע וניטרלי — כשאתה פשוט עונה על שאלה או מסביר משהו",
+};
+
+/** The face to fall back to when nothing better is known. */
+export const DEFAULT_FACE = "ambient";
+
 export const GROUPS = [
   { key: "mode", label: "מצב משחק" },
   { key: "board", label: "הלוח" },

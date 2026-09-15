@@ -83,13 +83,18 @@ async function post(route, payload) {
 /** Ask the AI to change the game. */
 export const requestChange = (payload) => post("edit", payload);
 
-/** Ask Claude for one line of trash talk. Never let this break a game. */
+/**
+ * One line of trash talk plus the face to say it with.
+ *
+ * Never allowed to break a game: a failure here returns an empty line and the
+ * caller keeps whatever canned line it already showed.
+ */
 export async function requestBanter(payload) {
   try {
-    const { line } = await post("banter", payload);
-    return line;
+    const { line, face } = await post("banter", payload);
+    return { line, face };
   } catch {
-    return "";
+    return { line: "", face: null };
   }
 }
 
