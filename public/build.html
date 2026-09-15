@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>המשחק שלי</title>
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" href="avatars/babydragon.webp" />
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <img class="topbar__avatar" id="avatar" alt="" />
+        <span class="topbar__who" id="who"></span>
+        <span class="topbar__spacer"></span>
+        <div class="topbar__actions">
+          <button class="btn btn--ghost btn--small" id="undo" type="button">בטל שינוי אחרון</button>
+          <button class="btn btn--ghost btn--small" id="reset" type="button">להתחיל מהתחלה</button>
+          <button class="btn btn--small" id="share" type="button">שיתוף המשחק</button>
+        </div>
+      </header>
+
+      <div class="workbench">
+        <div class="workbench__stage">
+          <div id="game"></div>
+        </div>
+
+        <aside class="workbench__side">
+          <div class="tabs" role="tablist">
+            <button class="tab" role="tab" aria-selected="true" data-panel="chat" type="button">
+              לדבר עם ה-AI
+            </button>
+            <button class="tab" role="tab" aria-selected="false" data-panel="settings" type="button">
+              לוח בקרה
+            </button>
+            <button class="tab" role="tab" aria-selected="false" data-panel="code" type="button">
+              מה ה-AI כתב
+            </button>
+          </div>
+
+          <!-- AI chat -->
+          <section class="panel chat" id="panel-chat" role="tabpanel">
+            <div class="chat__log" id="log"></div>
+            <div class="chat__ideas" id="ideas"></div>
+            <form class="chat__form" id="form">
+              <textarea
+                class="chat__input"
+                id="input"
+                rows="1"
+                placeholder="מה תרצו לשנות במשחק?"
+                autocomplete="off"
+              ></textarea>
+              <button class="btn" id="send" type="submit">שליחה</button>
+            </form>
+          </section>
+
+          <!-- admin / control area -->
+          <section class="panel" id="panel-settings" role="tabpanel" hidden>
+            <p class="panel__intro">
+              זה לוח הבקרה — אותן הגדרות בדיוק שה-AI משנה בשבילכם. כאן אתם משנים אותן בעצמכם.
+            </p>
+            <div id="settings"></div>
+          </section>
+
+          <!-- the config the AI actually produced -->
+          <section class="panel" id="panel-code" role="tabpanel" hidden>
+            <p class="panel__intro">
+              כל המשחק שלכם הוא בעצם הרשימה הזאת. כשאתם מבקשים מה-AI שינוי, זה מה שהוא משנה —
+              ההדגשות הן מה שהשתנה בפעם האחרונה.
+            </p>
+            <pre class="code" id="code"></pre>
+          </section>
+        </aside>
+      </div>
+    </div>
+
+    <dialog class="share" id="shareDialog">
+      <h2>המשחק של <span id="shareName"></span></h2>
+      <p class="panel__intro">סרקו את הקוד בטלפון, או שלחו את הקישור.</p>
+      <div class="share__qr" id="qr"></div>
+      <input class="share__link" id="shareLink" readonly />
+      <p>
+        <button class="btn btn--small" id="copyLink" type="button">העתקת הקישור</button>
+        <button class="btn btn--ghost btn--small" id="closeShare" type="button">סגירה</button>
+      </p>
+    </dialog>
+
+    <script type="module" src="js/build.js"></script>
+  </body>
+</html>

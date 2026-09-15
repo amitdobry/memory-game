@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>סדנת AI — מי אתם?</title>
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" href="avatars/babydragon.webp" />
+  </head>
+  <body>
+    <main class="pick">
+      <header>
+        <h1 class="pick__title">בונים משחק עם AI</h1>
+        <p class="pick__subtitle">בחרו את השם שלכם כדי להיכנס למשחק שלכם</p>
+      </header>
+
+      <div class="pick__grid" id="grid"></div>
+    </main>
+
+    <script type="module">
+      import { USERS } from "./js/users.js";
+
+      const grid = document.getElementById("grid");
+
+      for (const user of USERS) {
+        const card = document.createElement("a");
+        card.className = "pick__card" + (user.isInstructor ? " pick__card--instructor" : "");
+        card.href = `build.html?u=${encodeURIComponent(user.id)}`;
+        card.style.color = user.color;
+
+        const img = document.createElement("img");
+        img.src = `avatars/${user.avatar}`;
+        img.alt = "";
+
+        const name = document.createElement("div");
+        name.className = "pick__name";
+        name.textContent = user.name;
+
+        card.append(img, name);
+        grid.append(card);
+      }
+    </script>
+  </body>
+</html>

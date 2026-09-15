@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>משחק</title>
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" href="avatars/babydragon.webp" />
+  </head>
+  <body>
+    <main class="play">
+      <p class="play__by" id="by"></p>
+      <div id="game"></div>
+    </main>
+
+    <script type="module">
+      import { createGame } from "./js/game.js";
+      import { decodeConfig } from "./js/storage.js";
+      import { STARTER_CONFIG } from "./js/schema.js";
+      import { requestBanter } from "./js/api.js";
+
+      const params = new URLSearchParams(location.search);
+      const by = params.get("by");
+      if (by) {
+        document.getElementById("by").textContent = `המשחק של ${by}`;
+      }
+
+      const config = decodeConfig(location.hash.slice(1)) ?? { ...STARTER_CONFIG };
+      document.title = config.title;
+
+      const avatars = await fetch("avatars/manifest.json").then((r) => r.json());
+      createGame(document.getElementById("game"), config, {
+        avatars,
+        me: { name: by ?? "אני", avatar: null },
+        speak: requestBanter,
+      });
+    </script>
+  </body>
+</html>

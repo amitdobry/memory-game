@@ -1,0 +1,126 @@
+[
+  {
+    "id": "AfricanWarrior",
+    "file": "africanwarrior.webp"
+  },
+  {
+    "id": "Athlete",
+    "file": "athlete.webp"
+  },
+  {
+    "id": "Baby",
+    "file": "baby.webp"
+  },
+  {
+    "id": "BabyDragon",
+    "file": "babydragon.webp"
+  },
+  {
+    "id": "CardShark",
+    "file": "cardshark.webp"
+  },
+  {
+    "id": "Centaur",
+    "file": "centaur.webp"
+  },
+  {
+    "id": "Chipmunks",
+    "file": "chipmunks.webp"
+  },
+  {
+    "id": "DavyJones",
+    "file": "davyjones.webp"
+  },
+  {
+    "id": "Druid",
+    "file": "druid.webp"
+  },
+  {
+    "id": "Elemental",
+    "file": "elemental.webp"
+  },
+  {
+    "id": "Farmer",
+    "file": "farmer.webp"
+  },
+  {
+    "id": "Ghost",
+    "file": "ghost.webp"
+  },
+  {
+    "id": "Goddess",
+    "file": "goddess.webp"
+  },
+  {
+    "id": "Lion",
+    "file": "lion.webp"
+  },
+  {
+    "id": "Mermaid",
+    "file": "mermaid.webp"
+  },
+  {
+    "id": "Minotaur",
+    "file": "minotaur.webp"
+  },
+  {
+    "id": "Monk",
+    "file": "monk.webp"
+  },
+  {
+    "id": "Ninja",
+    "file": "ninja.webp"
+  },
+  {
+    "id": "PalmTree",
+    "file": "palmtree.webp"
+  },
+  {
+    "id": "Panda",
+    "file": "panda.webp"
+  },
+  {
+    "id": "Pharaoh",
+    "file": "pharaoh.webp"
+  },
+  {
+    "id": "Pirate",
+    "file": "pirate.webp"
+  },
+  {
+    "id": "Puppeteer",
+    "file": "puppeteer.webp"
+  },
+  {
+    "id": "Ranger",
+    "file": "ranger.webp"
+  },
+  {
+    "id": "Shaman",
+    "file": "shaman.webp"
+  },
+  {
+    "id": "Siren",
+    "file": "siren.webp"
+  },
+  {
+    "id": "Starfish",
+    "file": "starfish.webp"
+  },
+  {
+    "id": "Surfer",
+    "file": "surfer.webp"
+  },
+  {
+    "id": "TennisPlayer",
+    "file": "tennisplayer.webp"
+  },
+  {
+    "id": "Viking",
+    "file": "viking.webp"
+  },
+  {
+    "id": "Wolves",
+    "file": "wolves.webp"
+  }
+]

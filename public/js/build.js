@@ -1,0 +1,449 @@
+// ---------------------------------------------------------------------------
+// The workbench: game on one side, AI + control panel on the other.
+//
+// One rule runs the whole screen: applyConfig() is the ONLY way the game
+// changes. The AI, the control panel, undo and reset all go through it, so
+// every path is saved, undoable and visible in the code tab.
+// ---------------------------------------------------------------------------
+import { createGame } from "./game.js";
+import { requestChange, requestBanter, getCode, setCode } from "./api.js";
+import { userById } from "./users.js";
+import {
+  FIELDS,
+  GROUPS,
+  STARTER_CONFIG,
+  sanitize,
+  diff,
+  displayValue,
+} from "./schema.js";
+import {
+  loadConfig,
+  saveConfig,
+  pushHistory,
+  popHistory,
+  loadHistory,
+  clearHistory,
+  shareUrl,
+} from "./storage.js";
+
+// --- who is this? -----------------------------------------------------------
+
+const user = userById(new URLSearchParams(location.search).get("u"));
+if (!user) location.replace("index.html");
+
+document.getElementById("avatar").src = `avatars/${user.avatar}`;
+document.getElementById("who").textContent = user.name;
+document.documentElement.style.setProperty("--shell-accent", user.color);
+
+const avatars = await fetch("avatars/manifest.json").then((r) => r.json());
+
+// --- state ------------------------------------------------------------------
+
+let config = loadConfig(user.id);
+let lastChanges = [];
+let game = null;
+const chatHistory = [];
+
+const gameRoot = document.getElementById("game");
+const log = document.getElementById("log");
+
+function renderGame() {
+  game?.destroy();
+  game = createGame(gameRoot, config, {
+    avatars,
+    me: { name: user.name, avatar: user.avatar },
+    speak: requestBanter,
+  });
+  document.title = config.title;
+}
+
+/**
+ * The single entry point for changing the game.
+ * @param {object} next        the new config (will be sanitized)
+ * @param {object} options     {record: false} skips the undo stack (used by undo itself)
+ */
+function applyConfig(next, { record = true } = {}) {
+  const { config: clean } = sanitize(next, { avatarCount: avatars.length });
+  if (record) pushHistory(user.id, config);
+  lastChanges = diff(config, clean);
+  config = clean;
+  saveConfig(user.id, config);
+  renderGame();
+  renderSettings();
+  renderCode();
+  refreshUndo();
+}
+
+renderGame();
+
+// --- tabs -------------------------------------------------------------------
+
+for (const tab of document.querySelectorAll(".tab")) {
+  tab.addEventListener("click", () => {
+    for (const other of document.querySelectorAll(".tab")) {
+      const on = other === tab;
+      other.setAttribute("aria-selected", String(on));
+      document.getElementById(`panel-${other.dataset.panel}`).hidden = !on;
+    }
+  });
+}
+
+// ===========================================================================
+// 1. The AI panel
+// ===========================================================================
+
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
+
+const IDEAS = [
+  "תעשה לי לוח 6 על 6",
+  "אני רוצה 30 שניות בלבד",
+  "תחליף לערכת נושא של חלל",
+  "תוסיף ניקוד ותראה אותו",
+  "שהמשחק יהיה קשה יותר תוך כדי",
+  "כשאני מנצח תכתוב משהו מצחיק",
+];
+
+const ideasBox = document.getElementById("ideas");
+for (const idea of IDEAS) {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "idea";
+  chip.textContent = idea;
+  chip.addEventListener("click", () => {
+    input.value = idea;
+    input.focus();
+  });
+  ideasBox.append(chip);
+}
+
+function addMessage(kind, text) {
+  const node = document.createElement("div");
+  node.className = `msg msg--${kind}`;
+  node.textContent = text;
+  log.append(node);
+  log.scrollTop = log.scrollHeight;
+  return node;
+}
+
+/** Show exactly what moved, so the child can check the AI's work. */
+function addChangeList(node, changes) {
+  if (!changes.length) return;
+  const box = document.createElement("div");
+  box.className = "msg__changes";
+  for (const change of changes) {
+    const row = document.createElement("div");
+    row.className = "msg__change";
+    row.append(Object.assign(document.createElement("b"), { textContent: change.label + ":" }));
+    row.append(
+      Object.assign(document.createElement("span"), {
+        className: "msg__from",
+        textContent: displayValue(change.key, change.from),
+      }),
+    );
+    row.append(Object.assign(document.createElement("span"), { textContent: "←" }));
+    row.append(
+      Object.assign(document.createElement("span"), {
+        className: "msg__to",
+        textContent: displayValue(change.key, change.to),
+      }),
+    );
+    box.append(row);
+  }
+  node.append(box);
+
+  const undo = document.createElement("button");
+  undo.type = "button";
+  undo.className = "btn btn--ghost btn--small msg__undo";
+  undo.textContent = "לא אהבתי — תחזיר";
+  undo.addEventListener("click", () => {
+    undoLast();
+    undo.remove();
+  });
+  node.append(undo);
+  log.scrollTop = log.scrollHeight;
+}
+
+addMessage(
+  "system",
+  "כתבו לי מה לשנות במשחק, בעברית רגילה. אחרי כל שינוי — תשחקו ותבדקו שזה באמת מה שביקשתם.",
+);
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const message = input.value.trim();
+  if (!message) return;
+
+  addMessage("kid", message);
+  input.value = "";
+  input.style.height = "auto";
+  sendBtn.disabled = true;
+
+  const typing = document.createElement("div");
+  typing.className = "typing";
+  typing.innerHTML = "<span></span><span></span><span></span>";
+  log.append(typing);
+  log.scrollTop = log.scrollHeight;
+
+  try {
+    const data = await requestChange({ message, config, history: chatHistory.slice(-12) });
+    typing.remove();
+
+    const bubble = addMessage("ai", data.reply);
+    chatHistory.push({ role: "user", content: message });
+    chatHistory.push({ role: "assistant", content: data.reply });
+
+    const changes = diff(config, sanitize(data.config, { avatarCount: avatars.length }).config);
+    if (changes.length) {
+      applyConfig(data.config);
+      addChangeList(bubble, lastChanges);
+    }
+    for (const note of data.notes ?? []) addMessage("system", note);
+  } catch (error) {
+    typing.remove();
+    if (error.status === 401 || error.status === 403) {
+      addMessage("error", error.message);
+      askForCode();
+    } else {
+      addMessage("error", error.message ?? "לא הצלחתי להגיע ל-AI. אולי אין אינטרנט? תנסו שוב.");
+    }
+  } finally {
+    sendBtn.disabled = false;
+    input.focus();
+  }
+});
+
+// Enter sends, Shift+Enter makes a new line. Textarea grows with the text.
+input.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    form.requestSubmit();
+  }
+});
+input.addEventListener("input", () => {
+  input.style.height = "auto";
+  input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+});
+
+// ===========================================================================
+// 2. The control panel (admin area)
+// ===========================================================================
+
+const settingsRoot = document.getElementById("settings");
+
+function renderSettings() {
+  settingsRoot.innerHTML = "";
+
+  for (const group of GROUPS) {
+    const fields = FIELDS.filter((f) => f.group === group.key);
+    if (!fields.length) continue;
+
+    const section = document.createElement("div");
+    section.className = "settings__group";
+    section.append(
+      Object.assign(document.createElement("div"), {
+        className: "settings__legend",
+        textContent: group.label,
+      }),
+    );
+    for (const field of fields) section.append(renderField(field));
+    settingsRoot.append(section);
+  }
+}
+
+function renderField(field) {
+  const wrap = document.createElement("div");
+  wrap.className = field.type === "bool" ? "field field--check" : "field";
+  const id = `f-${field.key}`;
+
+  const label = document.createElement("label");
+  label.className = "field__label";
+  label.htmlFor = id;
+  label.textContent = field.label;
+
+  const change = (value) => applyConfig({ ...config, [field.key]: value });
+
+  if (field.type === "bool") {
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.id = id;
+    box.checked = Boolean(config[field.key]);
+    box.addEventListener("change", () => change(box.checked));
+    wrap.append(box, label);
+    return wrap;
+  }
+
+  wrap.append(label);
+  if (field.help) {
+    wrap.append(
+      Object.assign(document.createElement("span"), {
+        className: "field__help",
+        textContent: field.help,
+      }),
+    );
+  }
+
+  if (field.type === "int") {
+    const row = document.createElement("div");
+    row.className = "field__row";
+    const range = document.createElement("input");
+    range.type = "range";
+    range.id = id;
+    range.min = field.min;
+    range.max = field.max;
+    range.step = field.key === "flipBackMs" ? 100 : 1;
+    range.value = config[field.key];
+    const value = Object.assign(document.createElement("span"), {
+      className: "field__value",
+      textContent: String(config[field.key]),
+    });
+    range.addEventListener("input", () => (value.textContent = range.value));
+    range.addEventListener("change", () => change(Number(range.value)));
+    row.append(range, value);
+    wrap.append(row);
+    return wrap;
+  }
+
+  if (field.type === "enum") {
+    const select = document.createElement("select");
+    select.id = id;
+    for (const option of field.options) {
+      select.append(new Option(option.label, option.value, false, option.value === config[field.key]));
+    }
+    select.addEventListener("change", () => change(select.value));
+    wrap.append(select);
+    return wrap;
+  }
+
+  const text = document.createElement("input");
+  text.type = "text";
+  text.id = id;
+  text.value = field.type === "list" ? config[field.key].join(" ") : config[field.key];
+  text.addEventListener("change", () => {
+    change(field.type === "list" ? [...text.value.replace(/\s+/g, "")] : text.value);
+  });
+  wrap.append(text);
+  return wrap;
+}
+
+renderSettings();
+
+// ===========================================================================
+// 3. The code view — "this is what the AI actually wrote"
+// ===========================================================================
+
+const codeRoot = document.getElementById("code");
+
+function renderCode() {
+  const changed = new Set(lastChanges.map((c) => c.key));
+  codeRoot.innerHTML = "";
+
+  codeRoot.append(document.createTextNode("{\n"));
+  const keys = FIELDS.map((f) => f.key);
+  keys.forEach((key, i) => {
+    const line = `  "${key}": ${JSON.stringify(config[key])}${i < keys.length - 1 ? "," : ""}\n`;
+    if (changed.has(key)) {
+      codeRoot.append(Object.assign(document.createElement("b"), { textContent: line }));
+    } else {
+      codeRoot.append(document.createTextNode(line));
+    }
+  });
+  codeRoot.append(document.createTextNode("}"));
+}
+
+renderCode();
+
+// ===========================================================================
+// 4. Undo / reset / share
+// ===========================================================================
+
+const undoBtn = document.getElementById("undo");
+
+function refreshUndo() {
+  undoBtn.disabled = loadHistory(user.id).length === 0;
+}
+
+function undoLast() {
+  const previous = popHistory(user.id);
+  if (!previous) return;
+  applyConfig(previous, { record: false });
+  addMessage("system", "החזרתי את המשחק למה שהיה לפני השינוי האחרון.");
+}
+
+undoBtn.addEventListener("click", undoLast);
+refreshUndo();
+
+document.getElementById("reset").addEventListener("click", () => {
+  if (!confirm("זה מחזיר את המשחק בדיוק למצב ההתחלתי. כל השינויים שעשיתם ייעלמו. בטוחים?")) return;
+  clearHistory(user.id);
+  applyConfig({ ...STARTER_CONFIG }, { record: false });
+  addMessage("system", "התחלנו מחדש מהמשחק הבסיסי.");
+});
+
+const dialog = document.getElementById("shareDialog");
+const linkInput = document.getElementById("shareLink");
+
+document.getElementById("share").addEventListener("click", async () => {
+  const url = shareUrl(config, user.name);
+  document.getElementById("shareName").textContent = user.name;
+  linkInput.value = url;
+  dialog.showModal();
+  await drawQR(url);
+});
+
+document.getElementById("closeShare").addEventListener("click", () => dialog.close());
+document.getElementById("copyLink").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(linkInput.value);
+    document.getElementById("copyLink").textContent = "הועתק!";
+    setTimeout(() => (document.getElementById("copyLink").textContent = "העתקת הקישור"), 1500);
+  } catch {
+    linkInput.select();
+  }
+});
+
+// The QR library is a nice-to-have loaded on demand. If it cannot load, the
+// link itself still works — sharing never depends on it.
+let qrLoader = null;
+function loadQRLibrary() {
+  qrLoader ??= new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.append(script);
+  });
+  return qrLoader;
+}
+
+async function drawQR(url) {
+  const box = document.getElementById("qr");
+  box.innerHTML = "";
+  try {
+    await loadQRLibrary();
+    new window.QRCode(box, {
+      text: url,
+      width: 220,
+      height: 220,
+      correctLevel: window.QRCode.CorrectLevel.L,
+    });
+  } catch {
+    box.style.display = "none";
+  }
+}
+
+// ===========================================================================
+// 5. Workshop code
+//
+// Only asked for when the server is actually gated (the hosted setup). On a
+// laptop on the LAN the server runs open and this never appears.
+// ===========================================================================
+
+function askForCode() {
+  const entered = prompt("הכניסו את קוד הסדנה שקיבלתם מהמדריך:", getCode());
+  if (entered) {
+    setCode(entered);
+    addMessage("system", "הקוד נשמר. אפשר לנסות שוב.");
+  }
+}
