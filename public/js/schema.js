@@ -40,12 +40,19 @@ export const CARD_SETS = {
   space: {
     label: "חלל",
     kind: "emoji",
-    symbols: [..."🚀🛸👽🌍🌙⭐🪐🔭🌌🌠🛰🌞🌛💫🌟🌑🌓🌕🌗🌚🌝🌤⚡🔥❄🌈🪨🤖👾🧊🌋🗿"],
+    // Two rules, both learned by measuring rather than guessing:
+    // 1. trimmed from nine near-identical round bodies (🌑🌓🌕🌗🌚🌝🌙🌛🌍) to two;
+    // 2. no characters that default to TEXT presentation (🛰 ☄ ⚙ ❄ ⛸ and friends).
+    //    Those render as flat grey line glyphs instead of colour emoji, so they all
+    //    look alike at 39px — the size a card actually is on a phone.
+    symbols: [..."🚀🛸👽🌍🌙⭐🪐🔭🌌🌠🌞💫🌟🌑🌈🪨🤖👾🧊🌋🗿🔥⚡💎🔋🧪🚨🔮🎇🧲🎮🎨"],
   },
   sport: {
     label: "ספורט",
     kind: "emoji",
-    symbols: [..."⚽🏀🏈⚾🎾🏐🏉🥏🎱🏓🏸🥊🥋⛳🏹🛹🛼🎿🏂🏆🥇🥈🥉🎯🎳🪀🎣🤿🚲🛷🏅🎽"],
+    // Four medals (🥇🥈🥉🏅) and six balls were too many of the same silhouette.
+    // ⚾ and 🏐 in particular are both white spheres.
+    symbols: [..."⚽🏀🏈🎾🏐🏉🥏🎱🏓🏸🥊🥋⛳🏹🛹🛼🎿🏂🏆🥇🎯🎳🪀🎣🤿🚲🛷🎽🏒🥅🪂🥌"],
   },
   food: {
     label: "אוכל",
