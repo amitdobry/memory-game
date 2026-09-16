@@ -21,6 +21,13 @@ GET  /api/workshop/health   is the workshop switched on?
 The server code is `src/workshop/` and `src/web/workshopRoutes.ts` in the LIVE repo.
 That is why this repo can be public on a static host and still leak nothing.
 
+**Every AI call is written down.** LIVE meters each `edit` and `banter` call through
+its cost ledger — tokens from the provider's usage payload, priced per call the moment
+it returns — and the owner's private Engine Room (`/engine` on LIVE, Basic Auth,
+refreshes every 10 seconds) has a **Kids Workshop** panel showing spend today, spend
+total, cost per call, failures, the door state and quota, and the newest twenty calls.
+That is the bill, not an estimate.
+
 **Runtime dependencies: zero.** No build step, no bundler, no framework, no
 database. Node is used only to serve the folder during development.
 
