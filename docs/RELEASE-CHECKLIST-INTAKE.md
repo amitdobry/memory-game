@@ -1,126 +1,170 @@
 # Release checklist — visitor and lead intake (slices 2–3)
 
-Prepared 18 September 2026. **Nothing here has been executed.** Every step is a manual action
-by Amit, in this order, and each has a check that must pass before the next.
+Prepared 18 September 2026, revised the same day after review. **Nothing here has been
+executed.** Every step is a manual action by Amit, in this order, and each has a check that
+must pass before the next.
 
-State at preparation: LIVE `origin/product/web-v0` at `dbaf3af` (CI #165 green, including the
-Mongo-backed acquisition tests); Heroku at `6143d27`; memory-game `main` six commits ahead of
-GitHub and not published; no batch records exist anywhere; `ACQUISITION_ENABLED` is unset.
+**Accepted gate:** LIVE `product/web-v0` at `dbaf3af`, CI run #166 green — Engine 1351 offline
+tests and slug boot, Product build clean, Mongo-backed integration lane 651 tests including both
+acquisition integration files. That gate is not re-run for this review. The batch scripts added
+afterwards (`scripts/acq-batches.ts`, `scripts/acq-verify-referrals.ts`, `src/acquisition/
+batchSetup.ts`) must pass CI on `product/web-v0` **before** step 1, so that they are in the
+deployed slug.
+
+State at preparation: Heroku at `6143d27`; memory-game `main` ahead of GitHub and not published;
+no batch records anywhere; `ACQUISITION_ENABLED` unset.
+
+Two rules that hold throughout: **secrets are never printed or passed on a command line** —
+every check uses the application's own configured connection; and **nothing below creates,
+updates or deletes production records except where a step says exactly which record and how.**
 
 ---
 
-## 0. Before anything: does production MongoDB support the transaction?
+## 0. Does production MongoDB support the transaction?
 
 Lead intake writes the lead, the visit link and the audit row in one multi-document
-transaction. That needs a replica set (Atlas always is one) and MongoDB ≥ 4.2. CI proved it
-against `mongo:8`; production has not been checked from a developer machine.
+transaction, which needs a replica set on MongoDB ≥ 4.2. Production has not been checked.
 
-1. Get the production URI from the Heroku config without printing the secret into a log:
-   `heroku config:get MONGODB_URI --app live-intelligence` (copy it into the shell, do not
-   paste it anywhere else).
-2. Connect with `mongosh "<uri>"` and run:
-   ```
-   db.version()                    // expect 6.x, 7.x or 8.x
-   db.hello().setName              // expect a replica-set name, e.g. "atlas-xxxx-shard-0"
-   db.hello().isWritablePrimary    // expect true
-   ```
-3. Run the acquisition migrations' *idempotency*, not their content: `migrate-mongo status`
-   from a machine with the URI shows the two new files as `PENDING`. Nothing else.
+1. `heroku run npm run verify:db --app live-intelligence`. The script (`scripts/verify-database.ts`)
+   connects with the app's own `MONGODB_URI`, prints only `protocol://host`, the server version,
+   whether the deployment is a replica set, and the result of opening and committing a real
+   transaction on a throwaway collection it removes afterwards. No URI, no password.
+2. `heroku run npm run migrate:status --app live-intelligence` lists every migration with its
+   state. Expect the two acquisition migrations (`20260918210000`, `20260918230000`) as
+   **PENDING** and everything older as APPLIED. This shows *pending versus applied state*; it
+   says nothing about whether a migration is idempotent — that property is proven by the
+   offline migration tests and the `down/up/up` integration test, already run in CI.
 
-**Stop if** `setName` is missing (standalone) or the version is below 4.2. The release phase
-would still succeed and the intake would fail on the first lead with a transaction error.
+**Stop if** `verify:db` reports a standalone deployment, a version below 4.2, or a failed
+transaction probe. The release phase would still succeed and the first lead would fail.
 
 ## 1. Deploy LIVE with acquisition disabled
 
-1. Local gate with a Mongo available: `docker compose up -d` then
-   `ANTHROPIC_API_KEY= npm run predeploy` in `Live/`. CI #165 already ran the equivalent; this
-   is the belt to its braces.
-2. Confirm the switch is absent: `heroku config:get ACQUISITION_ENABLED --app live-intelligence`
-   prints nothing.
-3. Deploy: `git push heroku product/web-v0:main`. The release phase runs
-   `20260918210000-acquisition-data-layer` and `20260918230000-acquisition-lead-visitor-index`.
+1. Confirm the switch is absent: `heroku config:get ACQUISITION_ENABLED --app live-intelligence`
+   prints an empty line.
+2. Confirm what is being deployed: `git log --oneline -1 origin/product/web-v0` is the commit CI
+   last passed, and it contains the two batch scripts.
+3. Deploy: `git push heroku product/web-v0:main`. The release phase applies the two migrations.
 4. Check:
    - `heroku releases --app live-intelligence` shows the new release; `heroku logs --tail`
-     shows the two migrations applied and the web dyno listening.
-   - `curl -s https://live-intelligence-f6ec7b9df867.herokuapp.com/health` → `{"status":"ok"}`.
-   - `curl -s -X POST …/api/acquisition/visit -H 'content-type: application/json' -d '{"visitorId":"release-check-0001"}'`
-     → **503** `{"error":"acquisition_unavailable"}`. Nothing is written while disabled.
-   - `curl -s …/api/workshop/health` still answers as before (the classroom is untouched).
-   - Rollback if anything else: `heroku releases:rollback`. The migrations are additive and
-     harmless to leave in place.
+     shows both migrations applied and the web dyno listening;
+   - `heroku run npm run migrate:status` now shows both as APPLIED;
+   - `curl -s https://live-intelligence-f6ec7b9df867.herokuapp.com/health` → `{"status":"ok",…}`;
+   - `curl -s -X POST …/api/acquisition/visit -H 'content-type: application/json' -d '{"visitorId":"release-gate-1-disabled"}'`
+     → **503** `{"error":"acquisition_unavailable"}`. Nothing is read or written while disabled
+     (asserted by `tests/acquisitionIntake.test.ts`);
+   - `curl -s …/api/workshop/health` answers as before: the classroom door is untouched.
+   - Rollback: `heroku releases:rollback`. The migrations are additive and stay.
 
 ## 2. Create and verify the batch records
 
-There is no owner dashboard yet, and the endpoints never create batches. Proposed method: a
-small one-off script in LIVE, reviewed and run once.
+The endpoints never create batches. The owner dashboard does not exist yet. The tool is
+`scripts/acq-batches.ts`, which plans first and writes only on `--apply`, and refuses to change
+anything that already exists.
 
-1. Decide the batches on paper first: for each leaflet stack, a code (3–12 upper-case
-   alphanumerics, e.g. `Y7K2`), a label, which printed design it is (`legacyNumber` 1–6, or
-   none), and whose it is (a distributor, or Amit's own). Distributor records need only an
-   email and a display name at this stage; they cannot sign in until a later slice.
-2. Add `scripts/acq-batches.ts` (not yet written): reads a checked-in JSON list, upserts
-   `acq_distributors` by email and `acq_batches` by code (never overwriting an existing
-   `legacyNumber`), and prints one line per batch: code, legacy alias, distributor, created or
-   already present. Idempotent, so it can be re-run. It uses the models, so `strict: 'throw'`
-   catches a typo'd field.
-3. Run it against production once: `heroku run node scripts/acq-batches.ts --app live-intelligence`.
-4. Verify with `mongosh` (read-only):
+1. **Decide on paper**, then write a local config file that is **not committed**
+   (`scripts/acq-batches.local.json`, copied from `scripts/acq-batches.example.json`): for each
+   leaflet stack a `code` (3–12 upper-case alphanumerics), a `label`, its printed design as
+   `legacyNumber` 1–6 or none, and `owner`: a distributor key or `null` for Amit's own.
+   Distributors are listed by key, display name and the **name of an environment variable**
+   that holds their email. No email address is ever in a file that reaches git.
+   Ownership is a decision Amit makes; nothing in the tooling assumes one.
+2. **Dry run against production**, with the email variables passed to the one-off dyno only:
    ```
-   db.acq_batches.find({}, {code:1, legacyNumber:1, distributorId:1, status:1})
-   db.acq_batches.countDocuments({ legacyNumber: { $type: 'number' } })   // = number of printed designs in use
+   heroku run --env ACQ_DIST_A_EMAIL=<address> --app live-intelligence \
+     "node scripts/acq-batches.ts scripts/acq-batches.local.json"
    ```
-   The unique indexes will have refused any duplicate code or alias; a refusal is a data
-   mistake to fix in the JSON, not an index to drop.
-5. Do **not** print, hand out or scan anything yet.
+   (The local file must be on the dyno: either commit a *placeholder-free* copy under a
+   git-ignored path is impossible on Heroku, so paste its contents with `heroku run bash` and a
+   heredoc, or run the script from a developer machine with the production URI in the shell
+   environment — never on the command line.) The output lists `+` (to create) and `=` (already
+   present and matching) rows. Any **conflict** (an alias or owner that differs from the
+   database, a duplicate code or alias in the file, a missing email variable) is printed and the
+   run exits 1 having written nothing. Fix the file, never the database.
+3. **Apply** with the same command plus `--apply`. Distributors are created as `invited`;
+   batches as `active`. Running it again is a no-op (`=` everywhere).
+4. **Verify with the real resolver**, read-only, while acquisition is still disabled:
+   ```
+   heroku run --env ACQ_DIST_A_EMAIL=<address> --app live-intelligence \
+     "node scripts/acq-verify-referrals.ts scripts/acq-batches.local.json"
+   ```
+   It runs `parseReferral → resolveReferral` — the same functions the endpoints call — for every
+   code and every alias, checks each lands on the intended batch and the intended owner, and
+   probes an unknown code to show it resolves to nothing. Exit 0 with "All intended referrals
+   resolve" is the gate. The disabled HTTP endpoints cannot perform this check; the script does.
+5. Print and hand out nothing yet.
 
 ## 3. Publish memory-game
 
-1. In `AI workshop 10-13`: `npm test` (43 static checks) once more.
-2. `git push origin main`. The Pages workflow publishes `public/` within about a minute.
+1. In `AI workshop 10-13`: `npm test` (43 static checks).
+2. `git push origin main`. Pages publishes `public/` within about a minute.
 3. Check `https://amitdobry.github.io/memory-game/?b=3`:
-   - the landing page loads; the WhatsApp card's message ends with `(מעלון 3)`;
-   - the registration form submits and shows **"ההרשמה באתר עדיין לא פתוחה"** with the
-     WhatsApp alternative — the expected answer while the switch is off;
-   - `/memory-game/workshop.html` is the picker, `/memory-game/build.html?u=kid1` works,
-     the example game opens from the card.
-4. Rollback is `git revert` and push; Pages republishes.
+   - the page loads; the WhatsApp card's message ends with `(מעלון 3)`;
+   - the registration form submits and shows **"ההרשמה באתר עדיין לא פתוחה"** with the WhatsApp
+     alternative — correct while the switch is off;
+   - `/memory-game/workshop.html`, `/memory-game/build.html?u=kid1` and the example game card
+     all work as before.
+4. Rollback: `git revert`, push; Pages republishes.
 
-## 4. Enable registration
+## 4. Enable registration and prove the flow end to end
 
 1. `heroku config:set ACQUISITION_ENABLED=1 --app live-intelligence` (the dyno restarts).
-2. Referral check, one request per batch, from a terminal:
+2. **Referral check over HTTP** — one request per real code and alias, with an exact test id
+   each time, e.g. `visitorId: "smoke-2026-09-25-ref-Y7K2"`:
    ```
-   curl -s -X POST …/api/acquisition/visit -H 'content-type: application/json' -H 'origin: https://amitdobry.github.io' \
-     -d '{"visitorId":"release-check-Y7K2","ref":"Y7K2"}'        → {"ok":true,"recognised":true}
-   … -d '{"visitorId":"release-check-b3","b":"3"}'                 → {"ok":true,"recognised":true}
-   … -d '{"visitorId":"release-check-none","ref":"NOSUCH"}'        → {"ok":true,"recognised":false}
+   curl -s -X POST …/api/acquisition/visit -H 'content-type: application/json' \
+     -H 'origin: https://amitdobry.github.io' -d '{"visitorId":"smoke-2026-09-25-ref-Y7K2","ref":"Y7K2"}'
    ```
-   Every real code and alias must say `recognised: true`. Then delete the check rows:
-   `db.acq_visits.deleteMany({ visitorId: /^release-check-/ })`.
-3. The complete flow, on a real phone, with a **test family** (Amit's own details, a clearly
-   fake participant name):
-   - open `https://amitdobry.github.io/memory-game/?b=3` → in `mongosh`,
-     `db.acq_visits.findOne({}, {sort:{createdAt:-1}})` shows a fresh row with
-     `firstBatchId` = leaflet 3's batch and `hits: 1`;
-   - reload once → `hits: 2`, `firstBatchId` unchanged;
-   - submit the form → the page shows **"ההרשמה נקלטה"**; `db.acq_leads.findOne(…)` shows
-     `status: "submitted"`, `attribution.creditedBatchId` = leaflet 3, `creditedDistributorId`
-     = its distributor (or null for Amit's own), `consent.privacyVersion: "2026-09-18"`,
-     `parentPhone` in E.164; the visit row now has `leadId` set, `leadCount: 1`,
-     `expiresAt: null`;
-   - press the button again with nothing changed → the page still says registered and
-     `db.acq_leads.countDocuments()` did not grow (replay);
-   - `db.acq_audit.find()` shows one `lead.submitted` row whose `after` holds status and
-     attribution ids only — search it for the phone number and the name: nothing;
-   - `db.cost_events.countDocuments({ clause: 'workshop', startedAt: { $gt: <deploy time> } })`
-     is unchanged — no model call was made;
-   - delete the test lead, its audit row and its visit by `_id` afterwards.
-4. Only now hand leaflets to distributors. Rollback at any point is
-   `heroku config:unset ACQUISITION_ENABLED`: the endpoints answer 503 again and the page
-   returns to the WhatsApp alternative; stored leads are untouched.
+   Expect `{"ok":true,"recognised":true}` for every intended code and alias, and
+   `recognised:false` for `"ref":"NOSUCH"`.
+3. **Controlled idempotency check**, from a terminal, with an exact key, e.g.
+   `smoke-2026-09-25-lead-1`, and Amit's own contact details with an obviously synthetic
+   participant name:
+   ```
+   BODY='{"parentName":"…","parentPhone":"…","participantFirstName":"SMOKE-TEST","grade":"8","consent":true,"idempotencyKey":"smoke-2026-09-25-lead-1","visitorId":"smoke-2026-09-25-ref-Y7K2","ref":"Y7K2"}'
+   curl … -d "$BODY"                       → 201 {"ok":true,"leadRef":"<id>","replay":false}
+   curl … -d "$BODY"                       → 200 {"ok":true,"leadRef":"<same id>","replay":true}
+   curl … -d "${BODY/SMOKE-TEST/CHANGED}"  → 409 {"error":"idempotency_conflict"}
+   ```
+   This — not clicking the form twice — is the replay proof. The form locks after success by
+   design, so a second click on the page proves nothing about the server.
+4. **The page itself**, once, on a phone: open `…/memory-game/?b=3`, submit the same synthetic
+   family with a different participant nickname (`SMOKE-PAGE`). Expect **"ההרשמה נקלטה"**.
+5. **Inspect by exact ids**, read-only, in `mongosh` on the production database (opened with the
+   URI in the shell environment, not on the command line):
+   ```
+   db.acq_visits.findOne({ visitorId: "smoke-2026-09-25-ref-Y7K2" })
+     // firstBatchId = Y7K2's batch, hits ≥ 1, leadId = the lead below, leadCount ≥ 1, expiresAt null
+   db.acq_leads.findOne({ idempotencyKey: "smoke-2026-09-25-lead-1" })
+     // status submitted, attribution.creditedBatchId = Y7K2, creditedDistributorId = its owner or null,
+     // consent.privacyVersion "2026-09-18", parentPhone in E.164, grade "8"
+   db.acq_leads.countDocuments({ idempotencyKey: "smoke-2026-09-25-lead-1" })   // 1, despite three POSTs
+   db.acq_audit.find({ "subject.recordId": ObjectId("<leadRef>") })
+     // one lead.submitted row; its `after` holds status and attribution ids — search it for the
+     // phone and the name: nothing
+   db.cost_events.countDocuments({ clause: "workshop", startedAt: { $gt: ISODate("<enable time>") } })  // 0
+   ```
+   The page-submitted lead is found the same way by its own `idempotencyKey` (the page generates
+   it; read it from the lead whose `participantFirstName` is `SMOKE-PAGE` and note the `_id`).
+6. **Clean up by exact `_id`**, and only these:
+   ```
+   db.acq_leads.deleteOne({ _id: ObjectId("<lead 1>") })
+   db.acq_leads.deleteOne({ _id: ObjectId("<lead 2>") })
+   db.acq_visits.deleteOne({ visitorId: "smoke-2026-09-25-ref-Y7K2" })
+   db.acq_visits.deleteOne({ visitorId: "<the page's visitor id, from lead 2>" })
+   ```
+   plus the `smoke-…` visit rows from step 2, each by its exact `visitorId`. **The audit rows
+   stay.** `acq_audit` is append-only by policy and by schema; the two `lead.submitted` rows for
+   the smoke leads remain, identifiable by `subject.recordId` equal to the deleted lead ids and
+   by their timestamps. They record that a test lead was created and then removed, which is
+   true.
+7. Only now hand leaflets to distributors. Rollback at any point:
+   `heroku config:unset ACQUISITION_ENABLED` — the endpoints answer 503 again, the page returns
+   to the WhatsApp alternative, stored leads are untouched.
 
 ## What this release does not include
 
-Distributor login, the owner view of leads, demo grants, retention purges, and any
-notification when a lead arrives. Until the owner view exists, new leads are read with
-`mongosh` on `acq_leads`, newest first, or Amit is told by the parent over WhatsApp.
+Distributor login, the owner view of leads (planned: `docs/PLAN-OWNER-ACQUISITION-VIEW.md`),
+demo grants, retention purges, and any notification when a lead arrives. Until the owner view
+exists, new leads are read with `mongosh` on `acq_leads` by `createdAt`, or Amit hears from the
+parent over WhatsApp.

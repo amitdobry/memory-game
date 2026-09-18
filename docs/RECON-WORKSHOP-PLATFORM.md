@@ -13,6 +13,8 @@ read-only request, or saw the output myself, and the file and symbol are named. 
 means a document says so and I did not independently confirm it. **[recommendation]** is my
 proposal. Where the brief's premise and the repositories disagree, section 3 says so.
 
+> **Historical document.** Sections 1–11 are the reconnaissance as written on 18 September 2026, before any code existed. Where later work superseded a recommendation, the passage is marked *Historical* inline and the accepted replacement is named; §12a and §12b hold the corrections and the rollout order, and `RELEASE-CHECKLIST-INTAKE.md` and `PLAN-OWNER-ACQUISITION-VIEW.md` are the current operational documents. Verified facts in §1 remain facts about that date.
+
 Decisions Amit has already made for this work (18 September 2026):
 
 - this session is reconnaissance only; no code until approved;
@@ -348,7 +350,7 @@ One row per **visitor**, not per hit. The page generates `visitorId` (random UUI
 | `lastBatchId`, `lastSeenAt` | latest touch |
 | `hits` | counter; scans of the same phone do not create visitors |
 | `userAgent` (truncated) | no IP stored, matching `sessions` |
-| `leadId` (nullable) | set when this visitor submits |
+| `leadId` (nullable) | *Historical.* Implemented as the **latest** lead from this browser, with `leadCount` counting them (slice 3); the many-to-one direction is the lead's `visitorId`, indexed |
 
 Indexes: `visitorId` unique; `firstBatchId`, `lastBatchId`. TTL on `lastSeenAt` of ~180 days
 for visitors that never became leads (retention, §9.11).
@@ -384,7 +386,7 @@ Commercial facts, separate from funnel facts.
 ### 5.7 `acq_commissions` — a ledger, not a computed view
 | field | notes |
 |---|---|
-| `enrolmentId` (unique) | **this unique index is the idempotency guarantee**: recording payment twice cannot award twice |
+| `enrolmentId` | *Historical.* Implemented as an explicit `activeAward` boolean with a partial unique index `{enrolmentId}` where `activeAward: true` (§12a correction 1): one earned/paid award per enrolment, reversed rows kept |
 | `distributorId`, `batchId`, `leadId` | evidence, copied at award time so a later reassignment does not rewrite history |
 | `amountAgorot: 15000` | ₪150 |
 | `status: 'earned' \| 'paid' \| 'reversed'` | §6.4 |
@@ -393,7 +395,7 @@ Commercial facts, separate from funnel facts.
 ### 5.8 `acq_demo_grants` and `acq_demo_uses`
 | `acq_demo_grants` | notes |
 |---|---|
-| `leadId` (unique partial while `revokedAt` is null) | one live grant per lead; re-claiming returns the same grant |
+| `leadId` | *Historical.* Implemented as an explicit `revoked` boolean with a partial unique index `{leadId}` where `revoked: false` (§12a); revoked grants stay as history and a new grant may follow |
 | `tokenHash` (unique) | SHA-256 of the 24-byte token the browser holds; never the token |
 | `total: 50`, `remaining` | |
 | `expiresAt` (TTL) | e.g. 14 days |
@@ -465,6 +467,8 @@ issued ──expiresAt──► expired        issued ──owner──► revok
 earned ──refund or attribution correction──► reversed
 paid   ──refund──► reversed (with a note; money recovery is outside the system)
 ```
+> *Historical.* Superseded by §12a correction 1: reverse the wrong award and issue the corrected one; uniqueness is `{enrolmentId}` where `activeAward: true`. No refund workaround.
+
 Attribution correction on a lead **after** a commission exists does not edit the commission;
 it reverses it and, if the new distributor qualifies, creates a new `earned` row referencing the
 same enrolment — which the unique index would forbid. So: the unique key is `(enrolmentId,
@@ -598,7 +602,7 @@ in about a minute); rollback of LIVE is `heroku releases:rollback` (`DEPLOY.md`)
    root redirect repo needs nothing (it makes no API calls). Every new public route uses
    `corsHeaders()`; the no-wildcard test keeps holding.
 9. **Data minimisation, especially about minors.** Collect what the form already collects and
-   nothing else; `studentName` as first name only, with the label saying so; no IP addresses
+   nothing else; the participant as a first name or nickname only (*implemented as `participantFirstName`, 40 characters, no word-count rule — §12a correction 4*); no IP addresses
    stored anywhere (the `sessions` convention); user agent truncated. **Distributors see:** per
    batch counts, and per lead only `createdAt`, `grade`, `status`, and a masked handle
    (parent first name + last two phone digits) so they can recognise "the family I spoke to".
@@ -695,8 +699,7 @@ Only the ones that change the design.
    throttle × global daily cap × one grant per phone key. Verification would require a mail
    system that does not exist (Resend is sandbox-only to the owner's address). Revisit if the
    ledger shows abuse.
-5. **Reassigning attribution after a commission exists.** Recommended: forbid; correct via
-   refund + new enrolment. Alternative: reverse-and-reissue with a partial unique index (§6.4).
+5. **Reassigning attribution after a commission exists.** *Resolved (§12a correction 1):* reverse the old award and issue a new one, `activeAward` partial unique index. The refund workaround was rejected.
 6. **Demo lifetime.** Grant expiry (14 days?) and whether the public demo has its own
    switch-off date separate from `WORKSHOP_EXPIRES=2026-10-15`. Recommended: separate env var,
    unset by default.
@@ -712,8 +715,9 @@ Amit reviewed the report and corrected four points. These override the sections 
 
 1. **Attribution correction after a commission exists (§6.4, §12.5).** No refund-and-re-enrol
    workaround. The ledger stays immutable and audited: reverse the incorrect award, issue the
-   corrected award. The uniqueness rule becomes "one *active* award per enrolment" (a partial
-   unique index on `enrolmentId` where `status != 'reversed'`), so reversed history is kept.
+   corrected award. The uniqueness rule is "one *active* award per enrolment": an explicit
+   `activeAward` boolean and a partial unique index on `enrolmentId` where `activeAward: true`
+   (`$ne` is not a partial-filter operator), so reversed history is kept.
 2. **No source-text test for distributor queries (§9.6).** Grepping route code for
    `distributorId` is brittle and proves nothing about authorization. Use behavioural
    integration tests: distributor A cannot read B's batches, leads, commissions or aggregates,
