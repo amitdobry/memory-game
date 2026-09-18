@@ -38,7 +38,7 @@ and the board resizes, turns pink, and fills with sweets. The loop being taught 
 │  memory-game  (PUBLIC)      │          │  LIVE  (PRIVATE, Heroku)     │
 │  static site, zero deps     │          │  already holds ANTHROPIC_API_KEY
 │                             │  HTTPS   │                              │
-│  index.html  pick a name    │ ───────► │  POST /api/workshop/edit     │
+│  workshop.html pick a name │ ───────► │  POST /api/workshop/edit     │
 │  build.html  the workbench  │  + code  │  POST /api/workshop/banter   │
 │  play.html   shareable game │          │  GET  /api/workshop/health   │
 │                             │ ◄─────── │                              │

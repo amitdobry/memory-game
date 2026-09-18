@@ -38,16 +38,17 @@ database. Node is used only to serve the folder during development.
 Two servers, because the AI lives in the other one:
 
 ```bash
-cd ../Live && WORKSHOP_CODES="TEST01:דניאל" LIVE_ALLOWED_ORIGINS="http://localhost:3000" npm run web
+cd ../Live && WORKSHOP_OWNER_PASSWORD="pick-something" LIVE_ALLOWED_ORIGINS="http://localhost:3000" npm run web
 ```
 
 ```bash
 npm start
 ```
 
-Then open http://localhost:3000/?t=TEST01 — the `?t=` puts the workshop code in the
-browser so nobody has to type it. `npm start` also prints a LAN address that phones
-and tablets on the same wifi can use.
+Then open http://localhost:3000/workshop.html, pick a child, and when the Firekeeper
+asks for the password type the owner password (or an eight-digit code minted with it
+— see *The door* below). `npm start` also prints a LAN address that phones and tablets
+on the same wifi can use. http://localhost:3000/ is the public landing page.
 
 ---
 
@@ -55,7 +56,8 @@ and tablets on the same wifi can use.
 
 | Page | What it does | Needs a server? |
 |---|---|---|
-| `/` | Pick your name (3 children + an instructor, hard-coded) | no |
+| `/` | The public landing page for parents: what the workshop is, the ten meetings, a WhatsApp contact | no |
+| `/workshop.html` | Pick your name (3 children + an instructor, hard-coded) — the classroom entry | no |
 | `/build.html?u=kid1` | The workbench: game + AI chat + control panel + code view | only for the AI panel |
 | `/play.html#<code>` | Somebody's finished game, whole config packed into the URL | **no** |
 
@@ -110,22 +112,29 @@ than misbehaving quietly. **Run it after every change to `schema.js`.**
 
 ---
 
-## אבטחה / The workshop code
+## אבטחה / The door
 
-Children get a short code. Be clear-eyed about what it is: it sits in the page and
-anyone who opens devtools can read it, so it is **not a secret**. Three things make
-that fine, and none of them is the code:
+Three doors, one grant (`LIVE/src/workshop/access.ts`): the owner's permanent password
+(`WORKSHOP_OWNER_PASSWORD`, a 12-hour grant), an eight-digit code the owner mints with
+`POST /api/workshop/mint` that dies after 20 minutes, and — dormant until a mail key
+exists — asking the owner by email. Whatever the door, the browser ends up holding an
+opaque grant in `localStorage` and sends it as `x-workshop-access`.
+
+Be clear-eyed about what that grant is: it sits in the browser and anyone who opens
+devtools can read it, so it is **not a secret**. Three things make that fine, and none
+of them is the grant:
 
 1. **The endpoint is not a Claude proxy.** It takes one request shape and returns one
    answer shape — a memory-game config plus one Hebrew sentence capped at 400
    characters, on Haiku, with a 1000-token ceiling. The caller cannot name a model or
-   supply a prompt. A stolen code buys the ability to recolour a memory game.
-2. **It is rate-limited** per code per hour, and capped across all codes per day.
-3. **It expires**, which is the real answer to a code that has leaked.
+   supply a prompt. A stolen grant buys the ability to recolour a memory game.
+2. **It is rate-limited** per grant per hour, and capped across everything per day.
+3. **It expires**, which is the real answer to a grant that has leaked.
 
-Configured in LIVE's environment (`WORKSHOP_CODES`, `WORKSHOP_EXPIRES`,
-`WORKSHOP_HOURLY_LIMIT`, `WORKSHOP_DAILY_LIMIT`). It **fails closed**: with no codes
-set, the routes answer 503 rather than serving.
+Configured in LIVE's environment (`WORKSHOP_OWNER_PASSWORD`, `WORKSHOP_EXPIRES`,
+`WORKSHOP_HOURLY_LIMIT`, `WORKSHOP_DAILY_LIMIT`). It **fails closed**: with no owner
+password set and no live code, `/unlock` answers 401 "הסדנה עדיין לא נפתחה" and
+`/health` reports the password door shut.
 
 ---
 

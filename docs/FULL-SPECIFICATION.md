@@ -46,7 +46,7 @@ A session has worked if every child:
 
 ## 1.3 Screens, and every single control
 
-### Screen 1 — `index.html` — "Pick your name"
+### Screen 1 — `workshop.html` (was `index.html` until 18 Sep 2026; `/` is now the public landing page) — "Pick your name"
 
 The entry point. No login, no password, no accounts.
 
@@ -346,7 +346,7 @@ When a child asks for "a candy theme" they mean the colours **and** the pictures
 │  memory-game  (PUBLIC)         │          │  LIVE  (PRIVATE, Heroku)        │
 │  static · ZERO dependencies    │          │  already holds ANTHROPIC_API_KEY │
 │                                │  HTTPS   │                                 │
-│  index.html   pick a name      │ ───────► │  POST /api/workshop/unlock      │
+│  workshop.html pick a name     │ ───────► │  POST /api/workshop/unlock      │
 │  build.html   the workbench    │  + grant │  POST /api/workshop/mint        │
 │  play.html    shareable game   │          │  POST /api/workshop/ask         │
 │                                │ ◄─────── │  POST /api/workshop/edit        │
@@ -427,7 +427,8 @@ public/js/users.js        The children. Edit this to run a workshop
 public/js/contract.js     GENERATED — the contract hash
 public/css/app.css        ~1100 lines. Shell, workbench, chat, Firekeeper,
                           themes, board, overlay, scoreboard, mobile
-public/index.html         Pick-your-name
+public/index.html         The public landing page (parents)
+public/workshop.html      Pick-your-name (classroom entry)
 public/build.html         The workbench shell
 public/play.html          The shareable game (no server needed)
 server/index.js           A static file server for development. No API, no key

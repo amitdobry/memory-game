@@ -29,7 +29,16 @@ import {
 // --- who is this? -----------------------------------------------------------
 
 const user = userById(new URLSearchParams(location.search).get("u"));
-if (!user) location.replace("index.html");
+if (!user) {
+  // No child by that id: back to the picker. The picker lives at workshop.html now —
+  // index.html is the public landing page, which would be a confusing place to land a
+  // child who mistyped a link.
+  location.replace("workshop.html");
+  // The page is leaving. A module has no `return`, and letting the rest of this file
+  // run would throw on `user.avatar` and litter the console on the way out — so wait
+  // on a promise that never settles instead.
+  await new Promise(() => {});
+}
 
 document.getElementById("avatar").src = `avatars/${user.avatar}`;
 document.getElementById("who").textContent = user.name;
