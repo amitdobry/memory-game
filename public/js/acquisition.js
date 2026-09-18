@@ -75,7 +75,7 @@ export const FIELD_LABELS = {
   parentName: "שם ההורה",
   parentPhone: "טלפון",
   parentEmail: "אימייל",
-  participantFirstName: "שם המשתתף",
+  participantFirstName: "שם התלמיד",
   grade: "כיתה",
   note: "ההערה",
   consent: "אישור יצירת הקשר",

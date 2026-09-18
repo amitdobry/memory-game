@@ -73,7 +73,7 @@ test("index.html is the landing page, in Hebrew, RTL", () => {
 
 test("index.html leads to WhatsApp and shows the number", () => {
   assert.match(landing, /wa\.me\/972546111602/);
-  assert.match(landing, /0546 111 602/);
+  assert.match(landing, /054-611-1602/);
 });
 
 test("index.html has no third-party form destination and no analytics", () => {
@@ -119,9 +119,12 @@ test("index.html keeps the honesty boundary around the AI demo", () => {
   assert.match(landing, /את השינויים בעזרת ה-AI עושים המשתתפים בסדנה עצמה/);
 });
 
-test("index.html carries the two required hero lines", () => {
-  assert.match(landing, /10 מפגשים<\/span><span>3 תלמידים בלבד<\/span><span>ימי שישי/);
-  assert.match(landing, /ה-AI כותב הרבה מהקוד\. המשתתפים מחליטים, בודקים ומסבירים — וזה החלק החשוב\./);
+test("index.html carries the original hero wording, the approved lesson 6 and the plain student-name label", () => {
+  assert.match(landing, /עשרה מפגשים שבהם לומדים לחשוב כמו מפתחים, לעבוד נכון עם AI ולבנות משחקים שאפשר לפתוח ולשחק\./);
+  assert.match(landing, /איזה משחק אני רוצה ליצור, ואיך הופכים את הרעיון לתוכנית\?/);
+  assert.match(landing, /לכל משתתף יש רעיון למשחק משלו ותוכנית ברורה: איך משחקים, איך מנצחים ומה בונים קודם\./);
+  assert.match(landing, /<label for="f-student">שם התלמיד<\/label>/);
+  assert.doesNotMatch(landing, /או כינוי|לא צריך שם מלא|אין שמירה של פרטים/);
 });
 
 test("index.html avoids slash-heavy gendered forms in visible copy", () => {
