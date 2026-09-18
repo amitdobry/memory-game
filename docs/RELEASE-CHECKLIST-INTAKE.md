@@ -1,7 +1,30 @@
 # Release checklist — visitor and lead intake (slices 2–3)
 
-Prepared 18 September 2026, revised the same day after review. **Nothing here has been
-executed.** Every step is a manual action by Amit, in this order, and each has a check that
+Prepared 18 September 2026, revised the same day after review. **Executed on 19 September 2026 — see the execution record below.** Every step is a manual action by Amit, in this order, and each has a check that
+
+## Execution record — 19 September 2026
+
+Every step below was executed on 19 September 2026 (00:50–01:45 Israel time), by Claude with
+Amit's explicit authorisation, in the order written. Ownership of the six leaflet batches is
+**undecided**: all six exist as `unassigned`, none is credited to Amit or to any distributor.
+
+| Step | Result |
+| --- | --- |
+| Gate | LIVE `bfb8675` (adds the explicit `unassigned` batch state, the first-run batch config, the test-run inspect/cleanup scripts). CI #170 on `product/workshop-acquisition-slice-5` and CI #171 on `product/web-v0`: Engine 1378 tests, Product build, Mongo lane 669 tests — all green. (CI #169 at `fd2132e` failed two of the new Mongo-lane tests; fixed in `bfb8675`, nothing deployed from it.) |
+| 0 | `npm run verify:db` on Heroku: MongoDB 8.0.32, replica set, transaction probe committed. |
+| 1 | Heroku release **v82** = `bfb8675` with `ACQUISITION_ENABLED` unset. Release phase applied `20260918210000` and `20260918230000`; `migrate:status` shows 0 pending. `/health` 200, `/api/workshop/health` 200 (classroom), `POST /api/acquisition/visit` and `/lead` 503, `/engine` and `/engine/acquisition` 401 with `Basic realm="LIVE Engine Room"`, CORS preflight from `https://amitdobry.github.io` 204. |
+| 2 | Dry run found no batches and no distributors in production. `--apply` created `LEAF1..LEAF6` with legacy aliases 1..6, labels "עלון N — מחזור ראשון", all `unassigned`. `acq-verify-referrals` resolved all 12 forms (`ref=LEAFn`, `b=n`) through the endpoint resolver and confirmed `NOSUCHCODE` gets no credit. |
+| 3 | memory-game `main` pushed (`b2f6c3e`), Pages run #9 green. Live page carries the approved lesson 6 copy, links to `/workshop-game/` and the memory-game demo, loads `js/acquisition.js`; its visit beacon got 503 while intake was off. The submit-time "ההרשמה באתר עדיין לא פתוחה" state was confirmed from the deployed code, not by submitting the form. |
+| 4 | Heroku **v83** set `ACQUISITION_ENABLED=1`. Smoke test with synthetic contact data (all `@example.invalid`, phones `050000000N`), fresh visitor ids and unique idempotency keys, run label `smoke-20260919-v82`: 6 referral visits (odd batches via `ref`, even via `b`) → 202 recognised; 6 leads → 201; 6 exact retries → 200 replay with the same id, no duplicate; later direct visit → 202 not recognised and the visit kept `first=latest=LEAF1`; A-then-B (LEAF2 then b=5, lead from B's page) → `first=credited=LEAF2`, `latest=LEAF5`; unknown code → 202 not recognised, no credit; anonymous and wrong-credential `/engine/acquisition` → 401; GET on the visit endpoint → 405; malformed lead → 400 with field names only. The lead limiter (8 per 10 minutes per address) returned 429 mid-run, so the second half ran after the window; that is the limiter working. Every lead resolved `creditedDistributor=none` under an `unassigned` batch. The owner view was **not** opened in a browser: it needs Amit's Engine Room credential. |
+| 5 | Cleanup by exact ids (manifest of 7 lead `_id`s and 9 visitor ids, including the one enable-probe visit): dry run listed exactly those; `--apply` removed **7 leads, 9 visits**, added **7** `test-run.cleanup` audit rows; a second dry run found 0 present. Totals after: batches 6 (6 unassigned), distributors 0, leads 0, visits 0, audit 14 (7 `lead.submitted` + 7 `test-run.cleanup`). No collection was dropped; no audit row was touched. |
+
+Not tested: a physical QR scan (no leaflet is printed). Not done: distributor dashboards,
+payment or commission controls, AI-demo access, any distributor assignment, any leaflet
+distribution.
+
+Kill switch if anything below misbehaves: `heroku config:unset ACQUISITION_ENABLED --app live-intelligence`.
+
+---
 must pass before the next.
 
 **Accepted gates:** CI #166 on `product/web-v0` at `dbaf3af` (intake), and CI #167 at `810d97d`
