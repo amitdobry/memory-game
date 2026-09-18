@@ -738,6 +738,27 @@ invite-only distributors; ₪150 only after manually recorded full payment.
 Slice 1 (hygiene + static landing page) was implemented the same day; see the commits that
 follow this one.
 
+## 12b. Rollout order for the intake (slices 2–3), as accepted
+
+The order matters because the page calls the backend and the backend answers 503 until
+switched on. Nothing in it is automatic.
+
+1. **Deploy LIVE with acquisition disabled.** The release phase applies the two additive
+   migrations; `ACQUISITION_ENABLED` stays unset, so `/api/acquisition/*` answers
+   `503 acquisition_unavailable` and writes nothing.
+2. **Create and verify the batch records.** One `acq_batches` row per leaflet batch, with its
+   `code` and, for the six printed designs, its `legacyNumber`, and the distributor it belongs to
+   (or none for Amit's own). Verify with a `POST /api/acquisition/visit` for each `?ref=` and
+   `?b=` and confirm `recognised: true` — while still disabled this cannot be done through the
+   endpoint, so verification happens right after step 4 or against a staging database. No batch
+   is created by code; unknown codes never earn credit.
+3. **Publish the frontend** (memory-game `main` → GitHub Pages). The page handles the 503 as
+   "registration not yet open" and offers WhatsApp.
+4. **Enable acquisition** (`ACQUISITION_ENABLED=1`) only after the batch records resolve
+   correctly. From this point leads are stored.
+
+Registration accepts grades 7, 8 and 9 only; other grades are directed to WhatsApp.
+
 ## 13. Small bugs and stale spots found on the way (not fixed; for the "later" list)
 
 Landing page (`landing-page/index.html`):
