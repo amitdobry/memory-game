@@ -6,3 +6,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# Local Claude Code preview configuration; per machine, not part of the product.
+.claude/

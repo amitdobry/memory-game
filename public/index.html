@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>בונים עם AI — סדנת משחקים ואפליקציות לתלמידי ז׳–ט׳</title>
+<meta name="description" content="סדנה מעשית בת עשרה מפגשים לתלמידי כיתות ז׳–ט׳ ביוקנעם. לומדים לחשוב כמו מפתחים, לעבוד נכון עם AI ולבנות משחקים שאפשר לפתוח ולשחק. בהנחיית עמית דוברי.">
+<meta name="theme-color" content="#060b1e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23060b1e'/%3E%3Cpath d='M9 20l4-9 4 9M10.5 17h5' stroke='%2322d3ee' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3Ccircle cx='23' cy='12' r='2.5' fill='%23818cf8'/%3E%3C/svg%3E">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="בונים עם AI — סדנת משחקים ואפליקציות">
+<meta property="og:description" content="רעיון קטן. אפליקציה אמיתית. עשרה מפגשים לתלמידי ז׳–ט׳ ביוקנעם.">
+<meta property="og:locale" content="he_IL">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#060b1e;
+  --bg-2:#0a1330;
+  --ink:#eaf0ff;
+  --muted:#9fb0d4;
+  --dim:#7387ad;
+  --cyan:#22d3ee;
+  --cyan-soft:#7dd3fc;
+  --violet:#818cf8;
+  --violet-soft:#a78bfa;
+  --line:rgba(255,255,255,.10);
+  --card:rgba(255,255,255,.035);
+  --card-hi:rgba(255,255,255,.06);
+  --grad:linear-gradient(90deg,var(--cyan),var(--violet));
+  --radius:18px;
+  --maxw:1120px;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Heebo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:17px;
+  line-height:1.65;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* --- ambient glow, like the leaflet --- */
+.glow{position:fixed;inset:0;pointer-events:none;z-index:0}
+.glow::before,.glow::after{content:'';position:absolute;border-radius:50%;filter:blur(90px);opacity:.55}
+.glow::before{width:70vw;height:70vw;top:-28vw;left:-18vw;background:radial-gradient(circle,#1d4ed8 0%,rgba(29,78,216,0) 68%)}
+.glow::after{width:60vw;height:60vw;top:38vh;right:-22vw;background:radial-gradient(circle,#0e7490 0%,rgba(14,116,144,0) 70%)}
+
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%,#fff,transparent),
+    radial-gradient(1.5px 1.5px at 78% 9%,#cfe4ff,transparent),
+    radial-gradient(1px 1px at 33% 42%,#fff,transparent),
+    radial-gradient(1.5px 1.5px at 62% 61%,#dbeafe,transparent),
+    radial-gradient(1px 1px at 88% 48%,#fff,transparent),
+    radial-gradient(1px 1px at 21% 74%,#bae6fd,transparent),
+    radial-gradient(1.5px 1.5px at 51% 88%,#fff,transparent);
+}
+
+.wrap{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:0 20px}
+
+/* --- nav --- */
+header.nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);
+  background:rgba(6,11,30,.72);border-bottom:1px solid var(--line)}
+.nav-in{max-width:var(--maxw);margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:20px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:1.05rem;text-decoration:none;color:var(--ink);white-space:nowrap}
+.brand i{width:11px;height:11px;border-radius:3px;background:var(--grad);display:inline-block;transform:rotate(45deg)}
+.nav-links{display:flex;gap:22px;margin-inline-start:auto;font-size:.95rem}
+.nav-links a{color:var(--muted);text-decoration:none}
+.nav-links a:hover{color:var(--ink)}
+.nav-cta{background:var(--grad);color:#05122a;font-weight:700;padding:9px 18px;border-radius:999px;
+  text-decoration:none;font-size:.95rem;white-space:nowrap}
+@media (max-width:860px){.nav-links{display:none}.nav-cta{margin-inline-start:auto}}
+
+/* --- shared --- */
+.eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:.82rem;font-weight:700;
+  letter-spacing:.06em;color:var(--cyan-soft);text-transform:none}
+.eyebrow::before{content:'';width:9px;height:9px;background:var(--grad);transform:rotate(45deg);border-radius:2px}
+h1,h2,h3{line-height:1.15;margin:0}
+h1{font-size:clamp(2.3rem,5.6vw,3.7rem);font-weight:900;letter-spacing:-.02em}
+h2{font-size:clamp(1.7rem,4.2vw,2.7rem);font-weight:900;letter-spacing:-.015em}
+h3{font-size:1.12rem;font-weight:700}
+.grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{color:var(--muted);font-size:clamp(1.02rem,2.1vw,1.2rem);max-width:56ch}
+section{padding:clamp(56px,9vw,104px) 0;position:relative;z-index:1}
+.sec-head{margin-bottom:38px}
+.sec-head h2{margin:12px 0 14px}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:15px 30px;
+  border-radius:999px;text-decoration:none;font-weight:700;font-size:1.02rem;border:1px solid transparent;
+  transition:transform .15s ease,box-shadow .15s ease;cursor:pointer;font-family:inherit}
+.btn-primary{background:var(--grad);color:#05122a;box-shadow:0 12px 34px -12px rgba(34,211,238,.6)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 18px 40px -12px rgba(34,211,238,.7)}
+.btn-ghost{border-color:var(--line);color:var(--ink);background:var(--card)}
+.btn-ghost:hover{background:var(--card-hi)}
+.btn-row{display:flex;flex-wrap:wrap;gap:13px;margin-top:30px}
+/* One visible focus treatment for every interactive element, keyboard and screen reader alike. */
+a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid rgba(34,211,238,.75);outline-offset:3px;border-radius:6px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px}
+
+/* --- hero --- */
+.hero{padding-top:clamp(48px,7vw,86px);padding-bottom:clamp(40px,6vw,64px)}
+.hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(20px,4vw,48px);align-items:center}
+.hero-art{position:relative;min-height:340px}
+.hero-art svg{width:100%;height:auto;display:block;filter:drop-shadow(0 20px 60px rgba(34,211,238,.18))}
+@media (max-width:900px){
+  .hero-grid{grid-template-columns:1fr}
+  .hero-art{order:-1;min-height:0;max-width:440px;margin:0 auto 6px}
+}
+.hero h1{margin:16px 0 20px}
+.hero h1 span{display:block}
+.keyline{display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:22px;color:var(--ink);font-weight:700;font-size:1rem}
+.keyline span+span::before{content:'·';color:var(--cyan-soft);margin-inline-end:14px}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:clamp(40px,6vw,60px)}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 16px;text-align:center}
+.stat b{display:block;font-size:clamp(1.6rem,4vw,2.2rem);font-weight:900;line-height:1.1;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat span{color:var(--dim);font-size:.88rem}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+
+/* --- path --- */
+.path{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:24px;position:relative;overflow:hidden}
+.step::after{content:'';position:absolute;top:0;inset-inline-start:0;width:100%;height:2px;background:var(--grad);opacity:.55}
+.step b{display:inline-block;font-size:1.5rem;font-weight:900;color:var(--cyan-soft);letter-spacing:-.02em;
+  direction:ltr;unicode-bidi:isolate}
+.num-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+.step h3{margin:6px 0 8px}
+.step p{margin:0;color:var(--muted);font-size:.95rem}
+@media (max-width:900px){.path{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:540px){.path{grid-template-columns:1fr}}
+
+/* --- curriculum accordion --- */
+.meetings{display:grid;gap:10px}
+.part-label{margin:22px 0 4px;color:var(--dim);font-size:.85rem;font-weight:700;letter-spacing:.05em}
+.part-label:first-child{margin-top:0}
+details.meeting{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+details.meeting[open]{background:var(--card-hi);border-color:rgba(34,211,238,.32)}
+details.meeting summary{cursor:pointer;padding:17px 20px;display:flex;align-items:center;gap:16px;
+  font-weight:700;list-style:none}
+details.meeting summary::-webkit-details-marker{display:none}
+.mnum{flex:none;width:44px;height:36px;border-radius:9px;display:grid;place-items:center;
+  background:rgba(34,211,238,.12);color:var(--cyan-soft);font-weight:900;font-size:.9rem;
+  border:1px solid rgba(34,211,238,.24);font-variant-numeric:tabular-nums}
+.mtitle{flex:1}
+.mchev{flex:none;color:var(--dim);transition:transform .2s ease;font-size:1.1rem}
+details.meeting[open] .mchev{transform:rotate(180deg)}
+.mbody{padding:0 20px 20px;border-top:1px solid var(--line);margin-top:2px;padding-top:16px}
+.mbody dl{margin:0;display:grid;gap:12px}
+.mbody dt{font-size:.78rem;font-weight:700;letter-spacing:.06em;color:var(--cyan-soft)}
+.mbody dd{margin:3px 0 0;color:var(--muted)}
+
+/* --- lists --- */
+.checks{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.checks li{display:flex;gap:12px;align-items:flex-start;color:var(--muted)}
+.checks li::before{content:'';flex:none;width:20px;height:20px;margin-top:3px;border-radius:6px;
+  background:rgba(34,211,238,.13);border:1px solid rgba(34,211,238,.3);
+  background-image:linear-gradient(45deg,transparent 45%,var(--cyan) 45%,var(--cyan) 55%,transparent 55%);
+  background-size:9px 9px;background-position:center;background-repeat:no-repeat}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:clamp(24px,4vw,52px);align-items:start}
+@media (max-width:860px){.two-col{grid-template-columns:1fr}}
+
+/* --- games --- */
+.games{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:760px){.games{grid-template-columns:1fr}}
+.game{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:26px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:12px;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease}
+.game:hover{transform:translateY(-3px);border-color:rgba(129,140,248,.45);background:var(--card-hi)}
+.game .tag{font-size:.76rem;font-weight:700;letter-spacing:.08em;color:var(--violet-soft)}
+.game .art{height:104px;border-radius:12px;display:grid;place-items:center;font-size:1.5rem;letter-spacing:.3em;
+  background:linear-gradient(140deg,rgba(34,211,238,.16),rgba(129,140,248,.16));
+  border:1px solid var(--line)}
+.game p{margin:0;color:var(--muted);font-size:.95rem;flex:1}
+.game .go{color:var(--cyan-soft);font-weight:700;font-size:.95rem}
+.note{color:var(--dim);font-size:.9rem;margin:18px 0 0}
+
+/* --- details / facts --- */
+.facts{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media (max-width:900px){.facts{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.facts{grid-template-columns:1fr}}
+.fact{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.fact .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;margin-bottom:12px;
+  background:rgba(129,140,248,.14);border:1px solid rgba(129,140,248,.3);color:var(--violet-soft);
+  font-size:1.05rem;font-weight:900}
+.fact h3{margin-bottom:5px;font-size:1.02rem}
+.fact p{margin:0;color:var(--muted);font-size:.93rem}
+
+/* --- contact --- */
+.signup{background:linear-gradient(150deg,rgba(34,211,238,.09),rgba(129,140,248,.09));
+  border:1px solid rgba(129,140,248,.26);border-radius:24px;padding:clamp(26px,4vw,46px)}
+.limit-pill{display:inline-block;background:rgba(248,113,113,.14);border:1px solid rgba(248,113,113,.36);
+  color:#fca5a5;font-size:.84rem;font-weight:700;padding:6px 15px;border-radius:999px;margin-bottom:18px}
+form{display:grid;gap:14px;margin-top:26px}
+.field{display:grid;gap:6px}
+.field label{font-size:.9rem;font-weight:700;color:var(--ink)}
+.field .hint{font-size:.8rem;color:var(--dim);font-weight:400}
+input,select,textarea{font:inherit;font-size:1rem;color:var(--ink);background:rgba(4,8,22,.6);
+  border:1px solid var(--line);border-radius:12px;padding:13px 15px;width:100%}
+/* Was `input:focus,select,textarea:focus` — the missing `:focus` on `select` drew a
+   permanent focus ring on every dropdown. */
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(34,211,238,.45);outline-offset:1px}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(0% + 18px) calc(50% - 2px),calc(0% + 23px) calc(50% - 2px);
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+textarea{min-height:92px;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:620px){.row2{grid-template-columns:1fr}}
+.form-note{font-size:.84rem;color:var(--dim);margin:2px 0 0}
+.form-msg{display:none;padding:14px 16px;border-radius:12px;font-weight:700;margin-top:4px;line-height:1.5}
+.form-msg.ok{display:block;background:rgba(34,197,94,.14);border:1px solid rgba(34,197,94,.4);color:#86efac}
+.form-msg.warn{display:block;background:rgba(250,204,21,.12);border:1px solid rgba(250,204,21,.4);color:#fde68a}
+.form-msg.err{display:block;background:rgba(248,113,113,.14);border:1px solid rgba(248,113,113,.4);color:#fca5a5}
+.form-msg a{color:inherit;text-decoration:underline}
+.form-msg .btn{margin-top:10px}
+.preview-text{display:none;margin-top:12px;background:rgba(4,8,22,.6);border:1px solid var(--line);border-radius:12px;
+  padding:14px 16px;white-space:pre-wrap;color:var(--muted);font-size:.93rem}
+.preview-text.is-on{display:block}
+
+.wa-card{display:flex;align-items:center;gap:16px;background:rgba(4,8,22,.5);
+  border:1px solid var(--line);border-radius:16px;padding:18px 20px;text-decoration:none;color:inherit;
+  margin-top:24px;transition:border-color .16s ease}
+.wa-card:hover{border-color:rgba(34,211,238,.45)}
+.wa-card .who{flex:1}
+.wa-card .who b{display:block;font-size:1.05rem}
+.wa-card .who span{color:var(--muted);font-size:.93rem}
+.wa-card .num{font-weight:900;font-size:1.15rem;direction:ltr;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* --- footer --- */
+footer{border-top:1px solid var(--line);padding:34px 0;color:var(--dim);font-size:.92rem;position:relative;z-index:1}
+.foot-in{max-width:var(--maxw);margin:0 auto;padding:0 20px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.foot-in .sep{margin-inline-start:auto}
+footer a{color:var(--muted);text-decoration:none}
+
+.skip{position:absolute;inset-inline-start:-9999px}
+.skip:focus{inset-inline-start:12px;top:12px;z-index:99;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="stars"></div>
+
+<a class="skip" href="#main">דלגו לתוכן</a>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="#top"><i></i>בונים עם AI</a>
+    <nav class="nav-links" aria-label="ניווט">
+      <a href="#curriculum">התכנית</a>
+      <a href="#inside">המפגש הראשון</a>
+      <a href="#projects">לשחק</a>
+      <a href="#contact">דברו איתי</a>
+    </nav>
+    <a class="nav-cta" href="#contact">דברו איתי</a>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-grid">
+    <div>
+    <span class="eyebrow">סדנה מעשית לתלמידי כיתות ז׳–ט׳ ביוקנעם</span>
+    <h1><span>רעיון קטן.</span><span class="grad-text">אפליקציה אמיתית.</span></h1>
+    <p class="lead">עשרה מפגשים שבהם המשתתפים לומדים לחשוב כמו מפתחים, לעבוד נכון עם AI ולבנות משחקים שאפשר לפתוח בטלפון ולשחק.</p>
+    <p class="lead" style="margin-top:14px">ה-AI כותב הרבה מהקוד. המשתתפים מחליטים, בודקים ומסבירים — וזה החלק החשוב.</p>
+    <div class="keyline" aria-label="עיקרי הסדנה"><span>10 מפגשים</span><span>3 תלמידים בלבד</span><span>ימי שישי</span></div>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="#contact">דברו איתי ב-WhatsApp</a>
+      <a class="btn btn-ghost" href="#projects">נסו את המשחק</a>
+    </div>
+    </div>
+
+    <div class="hero-art" aria-hidden="true">
+      <svg viewBox="0 0 440 400" role="presentation">
+        <defs>
+          <linearGradient id="gA" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#22d3ee" stop-opacity=".55"/>
+            <stop offset="1" stop-color="#818cf8" stop-opacity=".25"/>
+          </linearGradient>
+          <linearGradient id="gB" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stop-color="#0ea5e9" stop-opacity=".16"/>
+            <stop offset="1" stop-color="#a78bfa" stop-opacity=".5"/>
+          </linearGradient>
+          <linearGradient id="gPath" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0" stop-color="#22d3ee" stop-opacity=".75"/>
+            <stop offset="1" stop-color="#818cf8" stop-opacity=".2"/>
+          </linearGradient>
+          <radialGradient id="gGlow">
+            <stop offset="0" stop-color="#67e8f9" stop-opacity=".75"/>
+            <stop offset="1" stop-color="#67e8f9" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="150" cy="232" r="118" fill="url(#gGlow)"/>
+        <g stroke="#7dd3fc" stroke-opacity=".28" fill="url(#gPath)">
+          <path d="M96 356l50-20 50 20-50 20z"/>
+          <path d="M162 330l46-18 46 18-46 18z" fill-opacity=".8"/>
+          <path d="M224 306l44-17 44 17-44 17z" fill-opacity=".62"/>
+          <path d="M284 283l40-16 40 16-40 16z" fill-opacity=".48"/>
+        </g>
+        <g>
+          <path d="M150 196l44 25-44 25-44-25z" fill="#67e8f9" fill-opacity=".85"/>
+          <path d="M106 221v30l44 25v-30z" fill="#22d3ee" fill-opacity=".45"/>
+          <path d="M194 221v30l-44 25v-30z" fill="#818cf8" fill-opacity=".45"/>
+        </g>
+        <g stroke="#bae6fd" stroke-opacity=".35">
+          <rect x="58"  y="96"  width="78"  height="104" rx="13" fill="url(#gA)"/>
+          <rect x="150" y="52"  width="94"  height="70"  rx="13" fill="url(#gB)"/>
+          <rect x="152" y="138" width="70"  height="62"  rx="12" fill="url(#gA)" fill-opacity=".8"/>
+          <rect x="258" y="96"  width="72"  height="88"  rx="13" fill="url(#gB)"/>
+          <rect x="266" y="18"  width="58"  height="58"  rx="12" fill="url(#gA)" fill-opacity=".6"/>
+        </g>
+        <g fill="#e0f2fe" fill-opacity=".8">
+          <circle cx="82"  cy="122" r="5"/>
+          <rect x="72"  y="160" width="50" height="6" rx="3" fill-opacity=".5"/>
+          <rect x="72"  y="174" width="32" height="6" rx="3" fill-opacity=".35"/>
+          <rect x="166" y="74"  width="62" height="7" rx="3.5" fill-opacity=".55"/>
+          <rect x="166" y="90"  width="40" height="7" rx="3.5" fill-opacity=".35"/>
+          <rect x="166" y="158" width="18" height="24" rx="4" fill-opacity=".5"/>
+          <rect x="190" y="150" width="18" height="32" rx="4" fill-opacity=".7"/>
+          <circle cx="294" cy="128" r="14" fill="none" stroke="#e0f2fe" stroke-opacity=".55" stroke-width="3"/>
+          <rect x="286" y="152" width="18" height="6" rx="3" fill-opacity=".45"/>
+          <path d="M283 42h24M283 50h16" stroke="#e0f2fe" stroke-opacity=".55" stroke-width="3" fill="none"/>
+        </g>
+        <g fill="#a5f3fc">
+          <circle cx="352" cy="66" r="2.5" fill-opacity=".8"/>
+          <circle cx="40"  cy="72" r="2" fill-opacity=".6"/>
+          <circle cx="372" cy="214" r="2" fill-opacity=".5"/>
+          <circle cx="28"  cy="286" r="2.5" fill-opacity=".45"/>
+        </g>
+      </svg>
+    </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b>10</b><span>מפגשים</span></div>
+      <div class="stat"><b>2</b><span>שעות בשבוע</span></div>
+      <div class="stat"><b>3</b><span>תלמידים בקבוצה</span></div>
+      <div class="stat"><b>ז׳–ט׳</b><span>כיתות</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT -->
+<section id="what">
+  <div class="wrap">
+    <div class="two-col">
+      <div>
+        <span class="eyebrow">מה עושים כאן</span>
+        <h2 style="margin:12px 0 18px">לומדים לבנות.<br><span class="grad-text">לא רק לבקש מ-AI תשובות.</span></h2>
+      </div>
+      <div>
+        <p class="lead" style="max-width:none">כל משתתף עובר דרך מלאה: רעיון, תכנון, גרסה ראשונה, בדיקות, שיפור ופרסום. ה-AI עוזר לכתוב, אבל המשתתפים מחליטים מה לבנות, בודקים אם זה עובד ומבינים איך החלקים מתחברים.</p>
+        <p class="lead" style="max-width:none;margin-top:16px">מתחילים יחד במשחק זיכרון ובמשחק לוח משותף. בחצי השני של הסדנה כל תלמיד ותלמידה מתכננים ובונים משחק מקורי משלהם.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PATH -->
+<section id="path">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">הדרך</span>
+      <h2>מעשרה מפגשים לתוצר שאפשר להציג</h2>
+    </div>
+    <div class="path">
+      <div class="step"><b>01</b><h3>מתחילים לבנות</h3><p>פוגשים AI וסוכנים, ומשלימים אפליקציה ראשונה שעובדת בטלפון.</p></div>
+      <div class="step"><b>02–05</b><h3>בונים יחד</h3><p>נותנים למשחק לוח משותף זיכרון, חוקים ועולם — והופכים אותו למוצר.</p></div>
+      <div class="step"><b>06–09</b><h3>יוצרים לבד</h3><p>כל משתתף מתכנן משחק, בונה ליבה שאפשר לשחק בה ומוסיף עומק.</p></div>
+      <div class="step"><b>10</b><h3>משיקים</h3><p>בודקים, מפרסמים ומציגים את ההחלטות שמאחורי המוצר.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CURRICULUM -->
+<section id="curriculum">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">תכנית הסדנה</span>
+      <h2>מה קורה בכל מפגש</h2>
+      <p class="lead">לחצו על מפגש כדי לראות את שאלת היום, מה רואים בסופו ומה לוקחים הביתה.</p>
+    </div>
+
+    <div class="meetings">
+
+      <p class="part-label">החלק הראשון · מדליקים את המנוע</p>
+
+      <details class="meeting" open>
+        <summary><span class="mnum">01</span><span class="mtitle">מרעיון לאפליקציה שעובדת בטלפון</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>אפשר באמת לבנות משהו אמיתי בעזרת AI, כבר היום?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>המשתתפים פותחים בטלפון משחק שהם עצמם שינו, ומראים אותו בבית.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>להבדיל בין בקשה מעורפלת לבקשה טובה ל-AI, ולבדוק תמיד את מה שהוא עשה.</dd></div>
+        </dl></div>
+      </details>
+
+      <p class="part-label">החלק השני · בונים יחד משחק לוח</p>
+
+      <details class="meeting">
+        <summary><span class="mnum">02</span><span class="mtitle">נותנים למשחק זיכרון</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>למה כשמרעננים את הדף הכול נעלם, ואיך גורמים לאפליקציה לזכור?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>סוגרים את הדפדפן באמצע משחק, פותחים מחדש, והמשחק ממשיך בדיוק מאיפה שעצרנו.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>מה זה מסד נתונים, ומה ההבדל בין "יש לנו אחד" ל"אנחנו משתמשים בו".</dd></div>
+        </dl></div>
+      </details>
+
+      <details class="meeting">
+        <summary><span class="mnum">03</span><span class="mtitle">נותנים למשחק מוח</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>איך המשחק יודע מה מותר ומה אסור, ומי מחליט?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>שחקן נוחת על משבצת שהקבוצה המציאה בעצמה, והמשחק מגיב בדיוק כפי שהקבוצה החליטה.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>לחשוב על חוקים כמו מתכנתים: מה קורה, באיזה תנאי, ומה קורה כשמישהו מנסה לרמות.</dd></div>
+        </dl></div>
+      </details>
+
+      <details class="meeting">
+        <summary><span class="mnum">04</span><span class="mtitle">נותנים למשחק עולם</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>למה משחק שעובד עדיין לא מרגיש כמו משחק, ומה חסר לו?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>אותו משחק מהשבוע שעבר נראה ומרגיש כמו עולם שהקבוצה המציאה: שם, סיפור, צבעים, דמויות.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>ההבדל בין "עובד" ל"טוב", ואיך מקבלים החלטות עיצוב בקבוצה בלי לריב.</dd></div>
+        </dl></div>
+      </details>
+
+      <details class="meeting">
+        <summary><span class="mnum">05</span><span class="mtitle">מפרויקט למוצר</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>איך יודעים שמשהו שבנינו מוכן שאדם זר ישתמש בו?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>מישהו שלא היה בסדנה משחק בגרסה שהמשתתפים הגדירו, בלי שאף אחד מסביר לו כלום.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>מה זה מוצר: משהו שעובד גם כשהיוצרים לא עומדים לידו. ואיך בודקים את זה באמת.</dd></div>
+        </dl></div>
+      </details>
+
+      <p class="part-label">החלק השלישי · כל אחד בונה משחק משלו</p>
+
+      <details class="meeting">
+        <summary><span class="mnum">06</span><span class="mtitle">בוחרים ומתכננים משחק אישי</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>מה אני באמת מספיק לבנות בארבעה מפגשים, ועל מה כדאי לוותר?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>כל משתתף מציג בעמוד אחד את המשחק שלו: מה הוא, איך משחקים בו, ומה בכוונה לא ייבנה.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>לתכנן לפני שבונים, ולצמצם רעיון גדול למשהו שאפשר לסיים. שימושי הרבה מעבר לתכנות.</dd></div>
+        </dl></div>
+      </details>
+
+      <details class="meeting">
+        <summary><span class="mnum">07</span><span class="mtitle">בונים ליבה שאפשר לשחק בה</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>מה הדבר הקטן ביותר שכבר אפשר לשחק בו?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>אפשר להתחיל, לעשות מהלך, לקבל תוצאה ולהגיע לסוף. גם אם זה עדיין מכוער.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>קודם שזה יעבוד, אחר כך שזה יהיה יפה. ולא להתבייש בגרסה ראשונה.</dd></div>
+        </dl></div>
+      </details>
+
+      <details class="meeting">
+        <summary><span class="mnum">08</span><span class="mtitle">מוסיפים עומק וזיכרון</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>מה גורם למישהו לרצות לשחק שוב מחר?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>למשחק יש דבר אחד שגורם לחזור אליו — שיא, התקדמות או אתגר — והוא נשמר גם אחרי שסוגרים.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>לבחור תוספת אחת טובה על פני חמש בינוניות, ולהוריד משהו כשהפרויקט מתנפח.</dd></div>
+        </dl></div>
+      </details>
+
+      <details class="meeting">
+        <summary><span class="mnum">09</span><span class="mtitle">עיצוב, בדיקות והכנה להשקה</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>מה קורה כשחבר משחק במשחק שלי, ואני לא מרשה לעצמי להסביר כלום?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>חבר משחק, היוצרים צופים בשקט ורושמים: איפה הוא הסתבך, איפה צחק, איפה ניסה לרמות.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>לקבל ביקורת בלי להתגונן, ולהבדיל בין באג שחייבים לתקן לרעיון שנחמד להוסיף.</dd></div>
+        </dl></div>
+      </details>
+
+      <details class="meeting">
+        <summary><span class="mnum">10</span><span class="mtitle">משיקים ומציגים</span><span class="mchev" aria-hidden="true">⌄</span></summary>
+        <div class="mbody"><dl>
+          <div><dt>שאלת היום</dt><dd>אני יכול להסביר לא רק מה בניתי, אלא למה ככה, ואיך זה עובד מבפנים?</dd></div>
+          <div><dt>מה רואים בסוף</dt><dd>כל משתתף משיק משחק מקורי עם קישור שאפשר לשלוח למשפחה, ומספר על באג אחד, פשרה אחת והחלטה אחת שהוא גאה בה.</dd></div>
+          <div><dt>מה לוקחים הביתה</dt><dd>תעודת סיום, משחק שאפשר לשתף, והיכולת לספר סיפור של בנייה: מה רציתי, מה קרה, מה למדתי.</dd></div>
+        </dl></div>
+      </details>
+
+    </div>
+  </div>
+</section>
+
+<!-- INSIDE -->
+<section id="inside">
+  <div class="wrap">
+    <div class="two-col">
+      <div>
+        <span class="eyebrow">הצצה למפגש הראשון</span>
+        <h2 style="margin:12px 0 16px">מעט הסברים.<br><span class="grad-text">הרבה עשייה.</span></h2>
+        <p class="lead">רוב הזמן מוקדש לחשיבה, בנייה ובדיקה מול המחשב. כך נראה המפגש הראשון:</p>
+      </div>
+      <div class="card">
+        <ul class="checks">
+          <li>משחקים במשחק שעובד אבל לא גמור, ומבינים מה חסר לו</li>
+          <li>מבקשים מה-AI שינוי אחד, בעברית, ובודקים אם הוא באמת עשה מה שביקשנו</li>
+          <li>מתקנים, משנים שוב, ומגלים מה הופך בקשה טובה לטובה</li>
+          <li>שולחים את המשחק הביתה בקישור, ופותחים אותו בטלפון</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROJECTS -->
+<section id="projects">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">אפשר לפתוח ולנסות</span>
+      <h2>המשחקים הם חומר הלימוד</h2>
+      <p class="lead">הדוגמאות אינן סרטון. נכנסים, משחקים ורואים איך רעיון הופך למוצר עובד.</p>
+    </div>
+    <div class="games">
+      <!-- A finished example game. The whole configuration travels in the URL fragment
+           (play.html decodes it), so this needs no server, no login and no AI call. -->
+      <a class="game" id="preview-link" href="play.html?by=%D7%94%D7%A1%D7%93%D7%A0%D7%94#eyJtb2RlIjoic29sbyIsImNsYXVkZVNraWxsIjoibm9ybWFsIiwicGxheWVyMU5hbWUiOiLXqdeX16fXnyAxIiwicGxheWVyMk5hbWUiOiLXqdeX16fXnyAyIiwiY2xhdWRlVGFsa3MiOmZhbHNlLCJ0aXRsZSI6Itee16nXl9enINeW15nXm9eo15XXnyDXkdeX15zXnCIsImNvbHMiOjQsInJvd3MiOjQsImNhcmRTZXQiOiJzcGFjZSIsImN1c3RvbVN5bWJvbHMiOltdLCJ0aW1lclNlY29uZHMiOjkwLCJwZWVrU2Vjb25kcyI6MCwiZmxpcEJhY2tNcyI6MTAwMCwiZGlmZmljdWx0eVJhbXAiOiJub25lIiwicG9pbnRzUGVyTWF0Y2giOjEwLCJwZW5hbHR5UGVyTWlzcyI6MCwic3BlZWRCb251cyI6ZmFsc2UsInNob3dTdGF0cyI6dHJ1ZSwidGhlbWUiOiJzcGFjZSIsInNob3dUaW1lciI6dHJ1ZSwic2hvd1Njb3JlIjp0cnVlLCJzb3VuZCI6ZmFsc2UsIndpbk1lc3NhZ2UiOiLXoNeZ16bXl9eq150hINeb15wg15TXlteV15LXldeqINeg157XpteQ15UiLCJsb3NlTWVzc2FnZSI6Iteg15LXnteoINeU15bXntefLiDXoteV15Mg16HXmdeR15XXkT8ifQ" target="_blank" rel="noopener">
+        <div class="art">★ ★ ?</div>
+        <span class="tag">המפגש הראשון · דוגמה מוכנה</span>
+        <h3>משחק הזיכרון</h3>
+        <p>כך נראה משחק זיכרון גמור, מהסוג שהמשתתפים בונים ומשנים במפגש הראשון: לוח, טיימר, ניקוד ועולם של חלל. שחקו בו ישר בדפדפן, בלי הרשמה. את השינויים בעזרת ה-AI עושים המשתתפים בסדנה עצמה.</p>
+        <span class="go">נסו את המשחק ↗</span>
+      </a>
+      <a class="game" href="https://amitdobry.github.io/workshop-game/" target="_blank" rel="noopener">
+        <div class="art">▢ ▣ ▤</div>
+        <span class="tag">מפגשים <span class="num-ltr">2–5</span> · נקודת ההתחלה</span>
+        <h3>מנוע משחק הלוח</h3>
+        <p>השלד המשותף שממנו הקבוצה יוצאת לדרך. משעמם בכוונה: הקבוצה תמציא לו עולם, חוקים, אירועים ומערכת ששומרת את המשחק.</p>
+        <span class="go">פתחו את הדוגמה ↗</span>
+      </a>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <span class="eyebrow">מאחורי המסך</span>
+      <h3 style="margin:10px 0 8px;font-size:1.25rem">רואים איך האפליקציה חושבת</h3>
+      <p style="margin:0;color:var(--muted)">ב-Engine Room המשתתפים רואים את המצב, הפונקציות, החיבור למסד הנתונים והיסטוריית האירועים. המערכת אינה קופסה שחורה.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FACTS -->
+<section id="details">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">פרטים חשובים</span>
+      <h2>קבוצה קטנה. עבודה אמיתית.</h2>
+    </div>
+    <div class="facts">
+      <div class="fact"><div class="ic">⌁</div><h3>ימי שישי</h3><p><span class="num-ltr">10:00–12:00</span>, עשרה מפגשים שבועיים ביוקנעם.</p></div>
+      <div class="fact"><div class="ic">3</div><h3>עד שלושה תלמידים</h3><p>קבוצה שמאפשרת לכל אחד ואחת לבנות, לשאול ולקבל ליווי.</p></div>
+      <div class="fact"><div class="ic">⌨</div><h3>מחשב נייד לכל משתתף</h3><p>מהמפגש השני עובדים על המחשבים האישיים וממשיכים בין המפגשים.</p></div>
+      <div class="fact"><div class="ic">✓</div><h3>תוצר ותעודת סיום</h3><p>כל משתתף מסיים עם משחק מקורי, קישור לשתף, ויכולת להסביר איך הוא עובד.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="wrap">
+    <div class="signup">
+      <span class="limit-pill">המחזור הראשון מוגבל לשלושה תלמידים</span>
+      <h2>רוצים לבדוק אם הסדנה מתאימה?</h2>
+      <p class="lead" style="margin-top:14px">כתבו לי ב-WhatsApp. נדבר על המשתתף או המשתתפת, על הניסיון הקודם ועל מה שהיו רוצים לבנות. אפשר למלא כאן כמה פרטים ואני אכין את ההודעה, או לפתוח שיחה ישירות.</p>
+
+      <form id="wa-form" novalidate>
+        <div class="row2">
+          <div class="field">
+            <label for="f-parent">שם ההורה</label>
+            <input id="f-parent" name="parent_name" type="text" autocomplete="name" required>
+          </div>
+          <div class="field">
+            <label for="f-grade">כיתה</label>
+            <select id="f-grade" name="grade" required>
+              <option value="">בחרו כיתה</option>
+              <option value="ז׳">ז׳</option>
+              <option value="ח׳">ח׳</option>
+              <option value="ט׳">ט׳</option>
+              <option value="אחר">אחר</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-student">שם פרטי או כינוי של המשתתף <span class="hint">(לא צריך שם מלא)</span></label>
+          <input id="f-student" name="student_name" type="text" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label for="f-note">מה היו רוצים לבנות? <span class="hint">(לא חובה)</span></label>
+          <textarea id="f-note" name="note"></textarea>
+        </div>
+
+        <button class="btn btn-primary" type="submit" style="width:100%;border:0">פתיחת WhatsApp עם ההודעה</button>
+        <p class="form-note">הלחיצה פותחת את WhatsApp עם הודעה מוכנה אליי. שום פרט לא נשלח ולא נשמר עד שתשלחו את ההודעה שם. שליחת ההודעה מתבצעת ב-WhatsApp.</p>
+        <div class="form-msg" id="form-msg" role="status" aria-live="polite"></div>
+        <pre class="preview-text" id="preview-text" aria-label="ההודעה שתישלח"></pre>
+      </form>
+
+      <a class="wa-card" id="wa-link" href="https://wa.me/972546111602">
+        <div class="who">
+          <b>עמית דוברי</b>
+          <span>פתיחת שיחה ב-WhatsApp ←</span>
+        </div>
+        <span class="num">0546 111 602</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="foot-in">
+    <span><strong style="color:var(--ink)">בונים עם AI</strong> · סדנת משחקים ואפליקציות · יוקנעם</span>
+    <span class="sep"><a href="#top">חזרה למעלה</a></span>
+  </div>
+</footer>
+
+<script type="module">
+import { resolveAttribution, whatsappLink } from "./js/attribution.js";
+
+const WHATSAPP_NUMBER = "972546111602";
+
+/* ------------------------------------------------------------------
+   Which leaflet brought this visitor? ?b=1..6 or ?ref=CODE, remembered
+   in this browser so a later visit is still credited. Browser side only;
+   the server does not know about any of this yet.
+   ------------------------------------------------------------------ */
+let storage = null;
+try { storage = window.localStorage; } catch { /* private browsing */ }
+const attribution = resolveAttribution(location.search, storage);
+
+const waCard = document.getElementById("wa-link");
+waCard.href = whatsappLink(WHATSAPP_NUMBER, attribution);
+
+/* ------------------------------------------------------------------
+   The WhatsApp composer.
+
+   This is NOT a registration form. Nothing is sent anywhere by this page:
+   it assembles a message and hands it to WhatsApp, and only the visitor
+   pressing "send" there sends anything. The copy on the page says so.
+   ------------------------------------------------------------------ */
+const form = document.getElementById("wa-form");
+const msg = document.getElementById("form-msg");
+const preview = document.getElementById("preview-text");
+
+function show(kind, html) {
+  msg.className = "form-msg " + kind;
+  msg.innerHTML = html;
+}
+
+function textOf(id) {
+  return document.getElementById(id).value.trim();
+}
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+
+  const parent = textOf("f-parent");
+  const grade = textOf("f-grade");
+  const student = textOf("f-student");
+  const note = textOf("f-note");
+
+  if (!parent || !grade || !student) {
+    show("err", "חסרים פרטים: שם ההורה, כיתה ושם פרטי של המשתתף.");
+    return;
+  }
+
+  const lines = [`שם ההורה: ${parent}`, `המשתתף: ${student}`, `כיתה: ${grade}`];
+  if (note) lines.push(`רוצים לבנות: ${note}`);
+  const url = whatsappLink(WHATSAPP_NUMBER, attribution, lines.join("\n"));
+
+  // Show the exact text, so nobody has to trust us about what WhatsApp will open with.
+  preview.textContent = decodeURIComponent(new URL(url).searchParams.get("text"));
+  preview.classList.add("is-on");
+
+  // window.open returns null when a popup was blocked (and always when "noopener" is
+  // passed, which is why it is set on the window afterwards instead). Never claim
+  // success on the strength of having called it.
+  let opened = null;
+  try { opened = window.open(url, "_blank"); } catch { opened = null; }
+  if (opened) {
+    try { opened.opener = null; } catch { /* cross-origin, fine */ }
+    show("ok",
+      "WhatsApp נפתח בחלון חדש עם ההודעה. ההודעה נשלחת רק כשתלחצו על שליחה שם." +
+      ` <br>אם החלון לא נפתח: <a href="${url}" rel="noopener">לחצו כאן לפתיחת WhatsApp</a>.`);
+  } else {
+    show("warn",
+      "הדפדפן חסם פתיחה של חלון חדש. אפשר לפתוח את WhatsApp עם ההודעה כאן:" +
+      ` <br><a class="btn btn-ghost" href="${url}" rel="noopener">פתיחת WhatsApp</a>`);
+  }
+});
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
+    "test": "node --test tests/*.test.mjs",
     "build:avatars": "node scripts/make-avatars.mjs",
     "export:contract": "node scripts/export-contract.mjs"
   },
