@@ -1,6 +1,7 @@
 # Release checklist — visitor and lead intake (slices 2–3)
 
 Prepared 18 September 2026, revised the same day after review. **Executed on 19 September 2026 — see the execution record below.** Every step is a manual action by Amit, in this order, and each has a check that
+must pass before the next.
 
 ## Execution record — 19 September 2026
 
@@ -25,7 +26,6 @@ distribution.
 Kill switch if anything below misbehaves: `heroku config:unset ACQUISITION_ENABLED --app live-intelligence`.
 
 ---
-must pass before the next.
 
 **Accepted gates:** CI #166 on `product/web-v0` at `dbaf3af` (intake), and CI #167 at `810d97d`
 on a feature branch (batch scripts + owner view) — Engine 1370 offline tests and slug boot,
