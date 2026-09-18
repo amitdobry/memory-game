@@ -29,9 +29,9 @@ Decisions Amit has already made for this work (18 September 2026):
 
 | System | Repo / path | Branch | Deployed at | Verified |
 |---|---|---|---|---|
-| Memory Game (public client) | `amitdobry/memory-game`, local `C:\Users\Admin\AI workshop 10-13` | `main` | `https://amitdobry.github.io/memory-game/` → HTTP 200 | [verified] `curl`, 18 Sep |
-| LIVE (private backend) | `amitdobry/live`, local `C:\Users\Admin\Live` | `product/web-v0`; `heroku/main` is at the same commit `6143d27` | `https://live-intelligence-f6ec7b9df867.herokuapp.com` → `/health` 200 `{"status":"ok","database":"connected"}` | [verified] `git branch -r`, `git log heroku/main`, `curl` |
-| Landing page | `C:\Users\Admin\AI Workshop\App 2 - day 2-5\landing-page\index.html` (copy in `Downloads`) | not a repo | **nowhere**. `https://amitdobry.github.io/` → HTTP 404 "Site not found" | [verified] `curl` |
+| Memory Game (public client) | `amitdobry/memory-game` (this repo) | `main` | `https://amitdobry.github.io/memory-game/` → HTTP 200 | [verified] `curl`, 18 Sep |
+| LIVE (private backend) | `amitdobry/live`, checked out beside this repo as `../Live` | `product/web-v0`; `heroku/main` is at the same commit `6143d27` | `https://live-intelligence-f6ec7b9df867.herokuapp.com` → `/health` 200 `{"status":"ok","database":"connected"}` | [verified] `git branch -r`, `git log heroku/main`, `curl` |
+| Landing page | a single `index.html` in a local `landing-page` folder next to the `workshop-game` checkout (not in any repo at the time of the recon; now `public/index.html` here) | not a repo | **nowhere**. `https://amitdobry.github.io/` → HTTP 404 "Site not found" | [verified] `curl` |
 | workshop-game (Days 2–5 skeleton) | `amitdobry/workshop-game`, local `...\App 2 - day 2-5\workshop-game` | `master` | `https://amitdobry.github.io/workshop-game/` → 200 | [verified]; out of scope by instruction |
 | LIVE product SPA | `Live/web/` | same | Vercel (URL not needed here) | [verified] `web/vercel.json` |
 
@@ -706,6 +706,38 @@ Only the ones that change the design.
 
 ---
 
+## 12a. Corrections accepted after review (18 September 2026)
+
+Amit reviewed the report and corrected four points. These override the sections above:
+
+1. **Attribution correction after a commission exists (§6.4, §12.5).** No refund-and-re-enrol
+   workaround. The ledger stays immutable and audited: reverse the incorrect award, issue the
+   corrected award. The uniqueness rule becomes "one *active* award per enrolment" (a partial
+   unique index on `enrolmentId` where `status != 'reversed'`), so reversed history is kept.
+2. **No source-text test for distributor queries (§9.6).** Grepping route code for
+   `distributorId` is brittle and proves nothing about authorization. Use behavioural
+   integration tests: distributor A cannot read B's batches, leads, commissions or aggregates,
+   including by guessed ids.
+3. **Vocabulary.** `visit`, `lead`, `enrolment`, `full payment` and `commission` stay separate
+   concepts (as §5 has them). `active` is never a lead status.
+4. **Minors' names (§5.5, §9.9).** The acquisition flow never stores a child's full name. Forms
+   ask for a first name or nickname only, and distributors never see it.
+5. **The parent's phone number is collected and validated explicitly by the lead endpoint.**
+   The slice-1 WhatsApp composer omits a phone field because WhatsApp itself carries the
+   sender's number — but that number never reaches our database. The future `POST
+   /api/acquisition/lead` form (§7.1) requires `phone`, normalises it to E.164 and validates it
+   server-side, exactly as §5.5 already specifies. The composer's omission is a V1 convenience,
+   not a design decision to carry forward.
+
+Decisions confirmed alongside: canonical URL `https://amitdobry.github.io/memory-game/`;
+picker moves to `/workshop.html`; distributor view masked to date, grade, status, parent first
+name and last two phone digits; demo grant = 50 `edit` requests, banter disabled for demo grants
+(canned lines only), 14-day life, first-touch default; no email verification in V1;
+invite-only distributors; ₪150 only after manually recorded full payment.
+
+Slice 1 (hygiene + static landing page) was implemented the same day; see the commits that
+follow this one.
+
 ## 13. Small bugs and stale spots found on the way (not fixed; for the "later" list)
 
 Landing page (`landing-page/index.html`):
@@ -742,8 +774,8 @@ curl … https://amitdobry.github.io/workshop-game/                             
 curl … https://live-intelligence-f6ec7b9df867.herokuapp.com/health                          → 200 {"status":"ok","database":"connected"}
 curl … https://live-intelligence-f6ec7b9df867.herokuapp.com/api/workshop/health             → 200 (see §1.3)
 curl -X OPTIONS …/api/workshop/edit -H "Origin: https://amitdobry.github.io" …               → 204, Access-Control-Allow-Origin: https://amitdobry.github.io
-git -C C:\Users\Admin\Live branch --show-current                                              → product/web-v0
-git -C C:\Users\Admin\Live log --oneline -1 heroku/main                                       → 6143d27 (same as product/web-v0)
+git -C ../Live branch --show-current                                                          → product/web-v0
+git -C ../Live log --oneline -1 heroku/main                                                   → 6143d27 (same as product/web-v0)
 ```
 
 Files read in full: memory-game `README.md`, `.github/workflows/pages.yml`, `public/*.html`,
