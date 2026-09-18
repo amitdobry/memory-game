@@ -25,6 +25,25 @@ import {
   whatsappLink,
 } from "../public/js/attribution.js";
 import { USERS } from "../public/js/users.js";
+import {
+  VISITOR_KEY,
+  VISITOR_ID,
+  getVisitorId,
+  referralFields,
+  normalizeForm,
+  fingerprint,
+  missingFields,
+  buildLeadPayload,
+  classifyOutcome,
+  describeFields,
+  postJson,
+  sendVisit,
+  GRADES,
+  createKeyState,
+  keyForSubmission,
+  markUncertain,
+  resetKeyState,
+} from "../public/js/acquisition.js";
 import { CONTRACT_VERSION } from "../public/js/contract.js";
 import { FIELDS, STARTER_CONFIG, THEME_CARD_SET, FIREKEEPER_FACES } from "../public/js/schema.js";
 
@@ -65,10 +84,33 @@ test("index.html has no third-party form destination and no analytics", () => {
   assert.doesNotMatch(landing, /googletagmanager|gtag\(/);
 });
 
-test("index.html never claims details were saved or sent by the page", () => {
-  assert.doesNotMatch(landing, /הפרטים נשלחו/);
-  assert.doesNotMatch(landing, /נשמרו/);
-  assert.match(landing, /שליחת ההודעה מתבצעת ב-WhatsApp/);
+test("index.html's markup never claims details were saved; only the confirmed-success branch in the script says registered", () => {
+  const markup = withoutCode(landing);
+  assert.doesNotMatch(markup, /הפרטים נשלחו|הפרטים נשמרו|ההרשמה נקלטה/);
+  // The success sentence exists exactly once, inside the script, after a confirmed acknowledgement.
+  assert.equal((landing.match(/ההרשמה נקלטה/g) ?? []).length, 1);
+  assert.match(landing, /case "created":\s*case "replay":/);
+  // A timeout is reported as unconfirmed, never as "nothing was saved".
+  assert.match(landing, /ייתכן שהפרטים כן נשמרו/);
+});
+
+test("index.html registration form: explicit phone, unchecked consent, privacy text, WhatsApp alternative", () => {
+  const markup = withoutCode(landing);
+  assert.match(markup, /<input id="f-phone" name="parentPhone" type="tel"[^>]*required/);
+  assert.match(markup, /<input id="f-consent" name="consent" type="checkbox">/);
+  assert.doesNotMatch(markup, /name="consent"[^>]*checked/);
+  for (const line of ["מה נשמר", "כדי שעמית יחזור אליכם", "מאיזה עלון או קוד הפניה", "מפיצי העלונים", "מחיקה"]) {
+    assert.ok(markup.includes(line), `privacy text is missing: ${line}`);
+  }
+  // No invented retention period and no compliance claim inside the privacy text itself.
+  const privacy = markup.slice(markup.indexOf('<div class="privacy"'), markup.indexOf('<label class="consent"'));
+  assert.ok(privacy.length > 200, "privacy block present");
+  assert.doesNotMatch(privacy, /\d+\s*(ימים|שבועות|חודשים|שנים)|GDPR|תקנות|חוק הגנת|בהתאם לחוק|תואם/);
+  assert.match(markup, /wa\.me\/972546111602/);
+  // Grades are the server's vocabulary: the workshop's own three, and an enquiry route for the rest.
+  for (const value of ['value="7"', 'value="8"', 'value="9"']) assert.ok(markup.includes(value), value);
+  assert.doesNotMatch(markup, /value="other"|value="אחר"/);
+  assert.match(markup, /כיתה אחרת\? כתבו לי ב-WhatsApp/);
 });
 
 test("index.html keeps the honesty boundary around the AI demo", () => {
@@ -260,4 +302,185 @@ test("LIVE's generated contract carries the same stamp (skipped when LIVE is not
   const match = /export const CONTRACT_VERSION = "([0-9a-f]{12})"/.exec(fs.readFileSync(live, "utf8"));
   assert.ok(match, "LIVE contract.ts has no CONTRACT_VERSION");
   assert.equal(match[1], CONTRACT_VERSION);
+});
+
+// ---------------------------------------------------------------------------
+// acquisition.js — the browser side of the intake
+// ---------------------------------------------------------------------------
+
+const formValues = (patch = {}) => ({
+  parentName: " Test Parent ",
+  parentPhone: "054-000-0000",
+  parentEmail: "",
+  participantFirstName: "Testy",
+  grade: "8",
+  note: "",
+  consent: true,
+  ...patch,
+});
+
+test("visitor id: remembered when storage works, temporary when it does not, always well-formed", () => {
+  const store = new Map();
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  const first = getVisitorId(storage);
+  assert.match(first, VISITOR_ID);
+  assert.equal(getVisitorId(storage), first);
+  assert.deepEqual([...store.keys()], [VISITOR_KEY]);
+
+  const broken = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); } };
+  const temp = getVisitorId(broken);
+  assert.match(temp, VISITOR_ID);
+  assert.notEqual(temp, getVisitorId(broken), "no storage means a fresh id per call, and no crash");
+  assert.match(getVisitorId(null), VISITOR_ID);
+
+  store.set(VISITOR_KEY, "garbage with spaces");
+  assert.notEqual(getVisitorId(storage), "garbage with spaces");
+});
+
+test("referral fields follow the server contract and the ref-over-b rule lives in attribution.js", () => {
+  assert.deepEqual(referralFields({ kind: "ref", code: "Y7K2" }), { ref: "Y7K2" });
+  assert.deepEqual(referralFields({ kind: "batch", number: "3" }), { b: "3" });
+  assert.deepEqual(referralFields(null), {});
+  assert.deepEqual(parseAttribution("?b=2&ref=Y7K2"), { kind: "ref", code: "Y7K2" });
+});
+
+test("the payload carries exactly what the server accepts and nothing it forbids", () => {
+  const payload = buildLeadPayload(formValues({ parentEmail: " Parent@Example.TEST ", note: " a note " }), {
+    idempotencyKey: "k-1234567890",
+    visitorId: "v-1234567890",
+    attribution: { kind: "batch", number: "3" },
+  });
+  assert.deepEqual(Object.keys(payload).sort(), ["b", "consent", "grade", "idempotencyKey", "note", "parentEmail", "parentName", "parentPhone", "participantFirstName", "visitorId"]);
+  assert.equal(payload.parentName, "Test Parent");
+  assert.equal(payload.consent, true);
+  for (const forbidden of ["status", "creditedBatchId", "creditedDistributorId", "privacyVersion", "capturedAt", "attribution"]) {
+    assert.equal(forbidden in payload, false, forbidden);
+  }
+  // Empty optionals are dropped, not sent as "".
+  const bare = buildLeadPayload(formValues(), { idempotencyKey: "k-1234567890", visitorId: null, attribution: null });
+  assert.equal("parentEmail" in bare, false);
+  assert.equal("note" in bare, false);
+  assert.equal("visitorId" in bare, false);
+});
+
+test("fingerprint: unchanged submission keeps its key, an edit is a new submission", () => {
+  const a = fingerprint(formValues());
+  // Whitespace and punctuation do not make a new submission; the server does the E.164 work.
+  assert.equal(fingerprint(formValues({ parentName: "Test Parent", parentPhone: "054 000 0000" })), a);
+  assert.notEqual(fingerprint(formValues({ participantFirstName: "Other" })), a);
+  assert.notEqual(fingerprint(formValues({ note: "now with a note" })), a);
+});
+
+test("client-side completeness check names the fields, including the unticked consent", () => {
+  assert.deepEqual(missingFields(formValues()), []);
+  assert.deepEqual(missingFields(formValues({ consent: false, parentPhone: "123", grade: "12" })), ["parentPhone", "grade", "consent"]);
+  assert.equal(describeFields(["parentPhone", "consent"]), "טלפון, אישור יצירת הקשר");
+  assert.equal(describeFields([]), "הפרטים שמילאתם");
+  assert.deepEqual(normalizeForm(formValues()).parentEmail, undefined);
+});
+
+test("outcomes: success only on an acknowledged 201/200, and every other case has a name", () => {
+  assert.equal(classifyOutcome(201, { ok: true, leadRef: "x" }), "created");
+  assert.equal(classifyOutcome(200, { ok: true, leadRef: "x", replay: true }), "replay");
+  assert.equal(classifyOutcome(200, null), "error");
+  assert.equal(classifyOutcome(201, { ok: false }), "error");
+  assert.equal(classifyOutcome(400, { error: "invalid_request" }), "invalid");
+  assert.equal(classifyOutcome(409, {}), "conflict");
+  assert.equal(classifyOutcome(429, {}), "rate_limited");
+  assert.equal(classifyOutcome(503, {}), "unavailable");
+  assert.equal(classifyOutcome(404, {}), "unavailable");
+  assert.equal(classifyOutcome(500, {}), "error");
+});
+
+test("postJson: a timeout is reported as a timeout, a network failure as network, and the beacon swallows both", async () => {
+  const hang = () => new Promise((_, reject) => { /* never resolves; abort rejects it */ });
+  const hangingFetch = (_url, { signal }) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" }))));
+  await assert.rejects(postJson("http://x/api/acquisition/lead", {}, { fetchImpl: hangingFetch, timeoutMs: 20 }), (e) => e.kind === "timeout");
+  await assert.rejects(postJson("http://x/api/acquisition/lead", {}, { fetchImpl: () => Promise.reject(new TypeError("Failed to fetch")) }), (e) => e.kind === "network");
+  void hang;
+
+  let posted = null;
+  const okFetch = async (url, init) => { posted = { url, body: JSON.parse(init.body) }; return { status: 202, json: async () => ({ ok: true, recognised: true }) }; };
+  await sendVisit("http://x", "v-1234567890", { kind: "ref", code: "Y7K2" }, { fetchImpl: okFetch });
+  assert.deepEqual(posted, { url: "http://x/api/acquisition/visit", body: { visitorId: "v-1234567890", ref: "Y7K2" } });
+  await sendVisit("http://x", "v-1234567890", null, { fetchImpl: () => Promise.reject(new Error("down")) });
+});
+
+test("acquisition.js stores only the visitor id, never a contact detail", () => {
+  const source = read("js/acquisition.js");
+  const writes = [...source.matchAll(/setItem\(([^,]+),/g)].map((m) => m[1].trim());
+  assert.deepEqual(writes, ["VISITOR_KEY"]);
+  assert.doesNotMatch(source, /sessionStorage|document\.cookie|location\.search\s*=|history\.(push|replace)State/);
+  // And the page's own script keeps the same promise.
+  const script = landing.slice(landing.indexOf('<script type="module">'));
+  assert.doesNotMatch(script, /setItem|sessionStorage|document\.cookie/);
+});
+
+test("index.html talks to LIVE through api.js's API_BASE, so the origin is decided in one place", () => {
+  assert.match(landing, /import \{ API_BASE \} from ".\/js\/api.js"/);
+  assert.match(landing, /\$\{API_BASE\}\/api\/acquisition\/lead/);
+  assert.doesNotMatch(landing, /herokuapp\.com/);
+});
+
+test("grades offered are exactly the workshop's: 7, 8, 9", () => {
+  assert.deepEqual(GRADES.map((g) => g.value), ["7", "8", "9"]);
+  assert.deepEqual(missingFields(formValues({ grade: "other" })), ["grade"]);
+});
+
+test("idempotency key: a timeout retry of an unchanged form reuses the key", () => {
+  const state = createKeyState();
+  const first = keyForSubmission(state, formValues());
+  assert.equal(first.fresh, true);
+  markUncertain(state); // the attempt timed out
+  const retry = keyForSubmission(state, formValues({ parentPhone: "054 000 0000" })); // same digits, different spacing
+  assert.equal(retry.key, first.key);
+  assert.equal(retry.fresh, false);
+  assert.equal(retry.rotatedAfterUncertain, false);
+});
+
+test("idempotency key: editing the form after an uncertain result is a NEW submission, and says so", () => {
+  const state = createKeyState();
+  const first = keyForSubmission(state, formValues());
+  markUncertain(state);
+  const edited = keyForSubmission(state, formValues({ participantFirstName: "Someone Else" }));
+  assert.notEqual(edited.key, first.key, "different data never travels under the previous key");
+  assert.equal(edited.fresh, true);
+  assert.equal(edited.rotatedAfterUncertain, true, "the page is told to warn that the earlier attempt may also have registered");
+  // A plain edit with no uncertain attempt behind it rotates quietly.
+  const quiet = keyForSubmission(state, formValues({ participantFirstName: "Third" }));
+  assert.equal(quiet.rotatedAfterUncertain, false);
+});
+
+test("idempotency key: 'register another participant' forgets the key even for identical fields", () => {
+  const state = createKeyState();
+  const first = keyForSubmission(state, formValues());
+  resetKeyState(state);
+  const next = keyForSubmission(state, formValues());
+  assert.notEqual(next.key, first.key);
+});
+
+test("registration works when browser storage is unavailable: a temporary visitor id, a valid payload, no throw", () => {
+  const broken = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); } };
+  const visitorId = getVisitorId(broken);
+  const attribution = resolveAttribution("?b=3", broken);
+  const payload = buildLeadPayload(formValues(), { idempotencyKey: keyForSubmission(createKeyState(), formValues()).key, visitorId, attribution });
+  assert.match(payload.visitorId, VISITOR_ID);
+  assert.equal(payload.b, "3", "the referral still travels with the lead even though nothing could be remembered");
+  assert.match(payload.idempotencyKey, VISITOR_ID);
+});
+
+test("a lost visit beacon does not change what the lead sends: the referral rides on the lead itself", () => {
+  const payload = buildLeadPayload(formValues(), { idempotencyKey: "k-1234567890", visitorId: "v-1234567890", attribution: { kind: "ref", code: "Y7K2" } });
+  assert.equal(payload.ref, "Y7K2");
+  assert.equal(payload.visitorId, "v-1234567890");
+});
+
+test("the page wires the key state, marks timeouts uncertain and explains a rotation", () => {
+  const script = landing.slice(landing.indexOf('<script type="module">'));
+  assert.match(script, /const keys = createKeyState\(\)/);
+  assert.match(script, /keyForSubmission\(keys, v\)/);
+  assert.match(script, /if \(failure\.kind === "timeout"\) \{\s*markUncertain\(keys\)/);
+  assert.match(script, /decision\.rotatedAfterUncertain/);
+  assert.match(script, /resetKeyState\(keys\)/);
+  assert.doesNotMatch(script, /keyFor_|\bkey = null\b/);
 });

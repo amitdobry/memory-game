@@ -226,9 +226,6 @@ textarea{min-height:92px;resize:vertical}
 .form-msg.err{display:block;background:rgba(248,113,113,.14);border:1px solid rgba(248,113,113,.4);color:#fca5a5}
 .form-msg a{color:inherit;text-decoration:underline}
 .form-msg .btn{margin-top:10px}
-.preview-text{display:none;margin-top:12px;background:rgba(4,8,22,.6);border:1px solid var(--line);border-radius:12px;
-  padding:14px 16px;white-space:pre-wrap;color:var(--muted);font-size:.93rem}
-.preview-text.is-on{display:block}
 
 .wa-card{display:flex;align-items:center;gap:16px;background:rgba(4,8,22,.5);
   border:1px solid var(--line);border-radius:16px;padding:18px 20px;text-decoration:none;color:inherit;
@@ -239,6 +236,17 @@ textarea{min-height:92px;resize:vertical}
 .wa-card .who span{color:var(--muted);font-size:.93rem}
 .wa-card .num{font-weight:900;font-size:1.15rem;direction:ltr;
   background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+.form-msg.info{display:block;background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.35);color:var(--cyan-soft)}
+[aria-invalid="true"]{border-color:rgba(248,113,113,.7)!important}
+.privacy{background:rgba(4,8,22,.5);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:.9rem;color:var(--muted)}
+.privacy>b{color:var(--ink);display:block;margin-bottom:6px}
+.privacy ul{margin:0;padding-inline-start:18px;display:grid;gap:5px}
+.privacy li b{color:var(--ink);font-weight:700}
+.consent{display:flex;gap:12px;align-items:flex-start;cursor:pointer;color:var(--ink);font-size:.95rem;line-height:1.5}
+.consent input{width:20px;height:20px;margin:3px 0 0;flex:none;accent-color:var(--cyan)}
+.alt{margin-top:30px;padding-top:24px;border-top:1px solid var(--line)}
+button[hidden]{display:none}
 
 /* --- footer --- */
 footer{border-top:1px solid var(--line);padding:34px 0;color:var(--dim);font-size:.92rem;position:relative;z-index:1}
@@ -579,48 +587,76 @@ footer a{color:var(--muted);text-decoration:none}
   <div class="wrap">
     <div class="signup">
       <span class="limit-pill">המחזור הראשון מוגבל לשלושה תלמידים</span>
-      <h2>רוצים לבדוק אם הסדנה מתאימה?</h2>
-      <p class="lead" style="margin-top:14px">כתבו לי ב-WhatsApp. נדבר על המשתתף או המשתתפת, על הניסיון הקודם ועל מה שהיו רוצים לבנות. אפשר למלא כאן כמה פרטים ואני אכין את ההודעה, או לפתוח שיחה ישירות.</p>
+      <h2>הרשמה לסדנה</h2>
+      <p class="lead" style="margin-top:14px">השאירו פרטים ואחזור אליכם לשיחה קצרה: על המשתתף או המשתתפת, על הניסיון הקודם ועל מה שהיו רוצים לבנות. ההרשמה כאן אינה מחייבת.</p>
 
-      <form id="wa-form" novalidate>
+      <form id="lead-form" novalidate>
         <div class="row2">
           <div class="field">
             <label for="f-parent">שם ההורה</label>
-            <input id="f-parent" name="parent_name" type="text" autocomplete="name" required>
+            <input id="f-parent" name="parentName" type="text" autocomplete="name" required maxlength="80">
+          </div>
+          <div class="field">
+            <label for="f-phone">טלפון של ההורה</label>
+            <input id="f-phone" name="parentPhone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" required placeholder="05x-xxx-xxxx" maxlength="32">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="f-student">שם פרטי או כינוי של המשתתף <span class="hint">(לא צריך שם מלא)</span></label>
+            <input id="f-student" name="participantFirstName" type="text" autocomplete="off" required maxlength="40">
           </div>
           <div class="field">
             <label for="f-grade">כיתה</label>
             <select id="f-grade" name="grade" required>
               <option value="">בחרו כיתה</option>
-              <option value="ז׳">ז׳</option>
-              <option value="ח׳">ח׳</option>
-              <option value="ט׳">ט׳</option>
-              <option value="אחר">אחר</option>
+              <option value="7">ז׳</option>
+              <option value="8">ח׳</option>
+              <option value="9">ט׳</option>
             </select>
+            <span class="hint">הסדנה מיועדת לכיתות ז׳–ט׳. כיתה אחרת? כתבו לי ב-WhatsApp למטה.</span>
           </div>
         </div>
         <div class="field">
-          <label for="f-student">שם פרטי או כינוי של המשתתף <span class="hint">(לא צריך שם מלא)</span></label>
-          <input id="f-student" name="student_name" type="text" autocomplete="off" required>
+          <label for="f-email">אימייל <span class="hint">(לא חובה)</span></label>
+          <input id="f-email" name="parentEmail" type="email" autocomplete="email" dir="ltr" maxlength="254">
         </div>
         <div class="field">
           <label for="f-note">מה היו רוצים לבנות? <span class="hint">(לא חובה)</span></label>
-          <textarea id="f-note" name="note"></textarea>
+          <textarea id="f-note" name="note" maxlength="500"></textarea>
         </div>
 
-        <button class="btn btn-primary" type="submit" style="width:100%;border:0">פתיחת WhatsApp עם ההודעה</button>
-        <p class="form-note">הלחיצה פותחת את WhatsApp עם הודעה מוכנה אליי. שום פרט לא נשלח ולא נשמר עד שתשלחו את ההודעה שם. שליחת ההודעה מתבצעת ב-WhatsApp.</p>
+        <div class="privacy" id="privacy">
+          <b>מה קורה לפרטים</b>
+          <ul>
+            <li><b>מה נשמר:</b> שם ההורה, טלפון, אימייל אם נמסר, שם פרטי או כינוי של המשתתף, כיתה, וההערה שכתבתם.</li>
+            <li><b>למה:</b> כדי שעמית יחזור אליכם בעניין הסדנה. לא לדיוור ולא לשום דבר אחר.</li>
+            <li><b>מאיפה הגעתם:</b> נשמר גם מאיזה עלון או קוד הפניה הגעתם לאתר.</li>
+            <li><b>מפיצי העלונים</b> עשויים לראות בעתיד מידע מוגבל בלבד: מאיזה עלון הגיעה הרשמה ומה מצבה. בלי פרטי קשר ובלי שם המשתתף.</li>
+            <li><b>מחיקה:</b> כדי למחוק את הפרטים כתבו לעמית ב-WhatsApp, במספר שלמטה.</li>
+          </ul>
+        </div>
+
+        <label class="consent" for="f-consent">
+          <input id="f-consent" name="consent" type="checkbox">
+          <span>קראתי מה נשמר ולמה, ואני מאשר או מאשרת שעמית ייצור איתי קשר בעניין הסדנה.</span>
+        </label>
+
+        <button class="btn btn-primary" id="submit-btn" type="submit" style="width:100%;border:0">הרשמה לסדנה</button>
         <div class="form-msg" id="form-msg" role="status" aria-live="polite"></div>
-        <pre class="preview-text" id="preview-text" aria-label="ההודעה שתישלח"></pre>
       </form>
 
-      <a class="wa-card" id="wa-link" href="https://wa.me/972546111602">
-        <div class="who">
-          <b>עמית דוברי</b>
-          <span>פתיחת שיחה ב-WhatsApp ←</span>
-        </div>
-        <span class="num">0546 111 602</span>
-      </a>
+      <div class="alt">
+        <span class="eyebrow">אפשרות אחרת</span>
+        <p class="note" style="margin:8px 0 0">מעדיפים לדבר? כתבו לי ישירות ב-WhatsApp. שם ההודעה נשלחת מכם, ולא דרך האתר.</p>
+        <a class="wa-card" id="wa-link" href="https://wa.me/972546111602">
+          <div class="who">
+            <b>עמית דוברי</b>
+            <span>פתיחת שיחה ב-WhatsApp ←</span>
+          </div>
+          <span class="num">0546 111 602</span>
+        </a>
+      </div>
     </div>
   </div>
 </section>
@@ -636,76 +672,182 @@ footer a{color:var(--muted);text-decoration:none}
 
 <script type="module">
 import { resolveAttribution, whatsappLink } from "./js/attribution.js";
+import { API_BASE } from "./js/api.js";
+import {
+  getVisitorId,
+  sendVisit,
+  buildLeadPayload,
+  missingFields,
+  postJson,
+  classifyOutcome,
+  describeFields,
+  createKeyState,
+  keyForSubmission,
+  markUncertain,
+  resetKeyState,
+} from "./js/acquisition.js";
 
 const WHATSAPP_NUMBER = "972546111602";
 
 /* ------------------------------------------------------------------
    Which leaflet brought this visitor? ?b=1..6 or ?ref=CODE, remembered
-   in this browser so a later visit is still credited. Browser side only;
-   the server does not know about any of this yet.
+   in this browser so a later visit is still credited.
    ------------------------------------------------------------------ */
 let storage = null;
 try { storage = window.localStorage; } catch { /* private browsing */ }
 const attribution = resolveAttribution(location.search, storage);
 
+/* ------------------------------------------------------------------
+   The visit beacon. A random id for this browser (not a person, not a
+   proven scan), sent with the referral. Nothing on the page waits for it.
+   ------------------------------------------------------------------ */
+const visitorId = getVisitorId(storage);
+void sendVisit(API_BASE, visitorId, attribution);
+
+/* ------------------------------------------------------------------
+   WhatsApp alternative: a greeting with the leaflet marker, nothing else.
+   ------------------------------------------------------------------ */
 const waCard = document.getElementById("wa-link");
 waCard.href = whatsappLink(WHATSAPP_NUMBER, attribution);
 
 /* ------------------------------------------------------------------
-   The WhatsApp composer.
+   The registration form.
 
-   This is NOT a registration form. Nothing is sent anywhere by this page:
-   it assembles a message and hands it to WhatsApp, and only the visitor
-   pressing "send" there sends anything. The copy on the page says so.
+   Only a confirmed acknowledgement from the server means "registered".
+   The same idempotency key is reused while the contact fields stay the
+   same, so a retry after a timeout cannot register twice; editing the
+   fields starts a new submission with a new key. Nothing typed here is
+   kept in the browser.
    ------------------------------------------------------------------ */
-const form = document.getElementById("wa-form");
+const form = document.getElementById("lead-form");
 const msg = document.getElementById("form-msg");
-const preview = document.getElementById("preview-text");
+const button = document.getElementById("submit-btn");
+
+const keys = createKeyState();
+let done = false;
+
+function values() {
+  const data = new FormData(form);
+  return {
+    parentName: data.get("parentName"),
+    parentPhone: data.get("parentPhone"),
+    parentEmail: data.get("parentEmail"),
+    participantFirstName: data.get("participantFirstName"),
+    grade: data.get("grade"),
+    note: data.get("note"),
+    consent: document.getElementById("f-consent").checked,
+  };
+}
 
 function show(kind, html) {
   msg.className = "form-msg " + kind;
   msg.innerHTML = html;
 }
 
-function textOf(id) {
-  return document.getElementById(id).value.trim();
+function busy(on) {
+  button.disabled = on;
+  button.textContent = on ? "שולח…" : "הרשמה לסדנה";
 }
 
-form.addEventListener("submit", (event) => {
+function waWithDetails(v) {
+  const lines = [`שם ההורה: ${v.parentName.trim()}`, `טלפון: ${v.parentPhone.trim()}`, `המשתתף: ${v.participantFirstName.trim()}`, `כיתה: ${form.querySelector("#f-grade option:checked")?.textContent ?? ""}`];
+  if (v.note && v.note.trim()) lines.push(`רוצים לבנות: ${v.note.trim()}`);
+  return whatsappLink(WHATSAPP_NUMBER, attribution, lines.join("\n"));
+}
+
+const WA_INSTEAD = (v) => ` <br><a class="btn btn-ghost" href="${waWithDetails(v)}" target="_blank" rel="noopener">לשלוח את הפרטים ב-WhatsApp במקום</a>`;
+
+function markInvalid(fields) {
+  for (const el of form.querySelectorAll("[aria-invalid]")) el.removeAttribute("aria-invalid");
+  const ids = { parentName: "f-parent", parentPhone: "f-phone", parentEmail: "f-email", participantFirstName: "f-student", grade: "f-grade", note: "f-note", consent: "f-consent" };
+  for (const f of fields) document.getElementById(ids[f])?.setAttribute("aria-invalid", "true");
+  const first = fields[0] && document.getElementById(ids[fields[0]]);
+  first?.focus();
+}
+
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (done) return;
+  const v = values();
 
-  const parent = textOf("f-parent");
-  const grade = textOf("f-grade");
-  const student = textOf("f-student");
-  const note = textOf("f-note");
+  const missing = missingFields(v);
+  if (missing.length) {
+    markInvalid(missing);
+    show("err", `חסר או לא תקין: ${describeFields(missing)}.`);
+    return;
+  }
+  markInvalid([]);
 
-  if (!parent || !grade || !student) {
-    show("err", "חסרים פרטים: שם ההורה, כיתה ושם פרטי של המשתתף.");
+  const decision = keyForSubmission(keys, v);
+  const payload = buildLeadPayload(v, { idempotencyKey: decision.key, visitorId, attribution });
+  busy(true);
+  show("info", decision.rotatedAfterUncertain
+    ? "שיניתם פרטים אחרי ניסיון שלא אושר. הפרטים החדשים נשלחים כהרשמה חדשה; אם הניסיון הקודם כן נקלט, עמית יראה את שניהם."
+    : "שולח את הפרטים…");
+
+  let result;
+  try {
+    result = await postJson(`${API_BASE}/api/acquisition/lead`, payload);
+  } catch (failure) {
+    busy(false);
+    if (failure.kind === "timeout") {
+      markUncertain(keys);
+      show("warn",
+        "לא קיבלנו אישור מהשרת בזמן. ייתכן שהפרטים כן נשמרו. " +
+        "אפשר ללחוץ שוב על ההרשמה בבטחה: שליחה חוזרת של אותם פרטים לא תיצור הרשמה כפולה." + WA_INSTEAD(v));
+    } else {
+      show("warn", "ההרשמה באתר לא זמינה כרגע. הפרטים לא נשלחו." + WA_INSTEAD(v));
+    }
     return;
   }
 
-  const lines = [`שם ההורה: ${parent}`, `המשתתף: ${student}`, `כיתה: ${grade}`];
-  if (note) lines.push(`רוצים לבנות: ${note}`);
-  const url = whatsappLink(WHATSAPP_NUMBER, attribution, lines.join("\n"));
+  const outcome = classifyOutcome(result.status, result.body);
+  busy(false);
 
-  // Show the exact text, so nobody has to trust us about what WhatsApp will open with.
-  preview.textContent = decodeURIComponent(new URL(url).searchParams.get("text"));
-  preview.classList.add("is-on");
-
-  // window.open returns null when a popup was blocked (and always when "noopener" is
-  // passed, which is why it is set on the window afterwards instead). Never claim
-  // success on the strength of having called it.
-  let opened = null;
-  try { opened = window.open(url, "_blank"); } catch { opened = null; }
-  if (opened) {
-    try { opened.opener = null; } catch { /* cross-origin, fine */ }
-    show("ok",
-      "WhatsApp נפתח בחלון חדש עם ההודעה. ההודעה נשלחת רק כשתלחצו על שליחה שם." +
-      ` <br>אם החלון לא נפתח: <a href="${url}" rel="noopener">לחצו כאן לפתיחת WhatsApp</a>.`);
-  } else {
-    show("warn",
-      "הדפדפן חסם פתיחה של חלון חדש. אפשר לפתוח את WhatsApp עם ההודעה כאן:" +
-      ` <br><a class="btn btn-ghost" href="${url}" rel="noopener">פתיחת WhatsApp</a>`);
+  switch (outcome) {
+    case "created":
+    case "replay":
+      done = true;
+      for (const el of form.querySelectorAll("input,select,textarea")) el.disabled = true;
+      button.hidden = true;
+      show("ok",
+        "ההרשמה נקלטה. עמית יחזור אליכם בטלפון או ב-WhatsApp. " +
+        `<br><button type="button" class="btn btn-ghost" id="another">להרשמת משתתף נוסף</button>`);
+      document.getElementById("another").addEventListener("click", () => {
+        done = false;
+        resetKeyState(keys);
+        for (const el of form.querySelectorAll("input,select,textarea")) el.disabled = false;
+        document.getElementById("f-student").value = "";
+        document.getElementById("f-grade").value = "";
+        document.getElementById("f-note").value = "";
+        document.getElementById("f-consent").checked = false;
+        button.hidden = false;
+        show("", "");
+        msg.className = "form-msg";
+        document.getElementById("f-student").focus();
+      });
+      break;
+    case "invalid":
+      markInvalid(result.body?.fields ?? []);
+      show("err", `השרת לא קיבל את הפרטים. בדקו: ${describeFields(result.body?.fields)}.`);
+      break;
+    case "conflict":
+      show("warn",
+        "הפרטים האלה שונו מאז ניסיון קודם. " +
+        `<br><button type="button" class="btn btn-ghost" id="fresh">לשלוח כהרשמה חדשה</button>`);
+      document.getElementById("fresh").addEventListener("click", () => {
+        resetKeyState(keys);
+        form.requestSubmit();
+      });
+      break;
+    case "rate_limited":
+      show("warn", "נשלחו יותר מדי בקשות מהמכשיר הזה. חכו כמה דקות ונסו שוב." + WA_INSTEAD(v));
+      break;
+    case "unavailable":
+      show("warn", "ההרשמה באתר עדיין לא פתוחה. הפרטים לא נשלחו." + WA_INSTEAD(v));
+      break;
+    default:
+      show("err", "משהו השתבש בצד שלנו והפרטים לא נשלחו. נסו שוב בעוד רגע." + WA_INSTEAD(v));
   }
 });
 </script>
