@@ -4,12 +4,10 @@ Prepared 18 September 2026, revised the same day after review. **Nothing here ha
 executed.** Every step is a manual action by Amit, in this order, and each has a check that
 must pass before the next.
 
-**Accepted gate:** LIVE `product/web-v0` at `dbaf3af`, CI run #166 green — Engine 1351 offline
-tests and slug boot, Product build clean, Mongo-backed integration lane 651 tests including both
-acquisition integration files. That gate is not re-run for this review. The batch scripts added
-afterwards (`scripts/acq-batches.ts`, `scripts/acq-verify-referrals.ts`, `src/acquisition/
-batchSetup.ts`) must pass CI on `product/web-v0` **before** step 1, so that they are in the
-deployed slug.
+**Accepted gates:** CI #166 on `product/web-v0` at `dbaf3af` (intake), and CI #167 at `810d97d`
+on a feature branch (batch scripts + owner view) — Engine 1370 offline tests and slug boot,
+Product build clean, Mongo-backed integration lane 666 tests including every acquisition file.
+`810d97d` is the commit to deploy; the batch scripts and the owner view are in its slug.
 
 State at preparation: Heroku at `6143d27`; memory-game `main` ahead of GitHub and not published;
 no batch records anywhere; `ACQUISITION_ENABLED` unset.
@@ -162,9 +160,23 @@ anything that already exists.
    `heroku config:unset ACQUISITION_ENABLED` — the endpoints answer 503 again, the page returns
    to the WhatsApp alternative, stored leads are untouched.
 
+## 5. Reading leads: the owner view
+
+Once the new LIVE version is deployed (step 1 with `810d97d` or later), the leads are read at
+**`/engine/acquisition`** on the Heroku origin — the same Basic credential as the Engine Room
+(`ENGINE_ROOM_USER` / `ENGINE_ROOM_PASSWORD`), which fails closed with 503 if unset and 401
+without it. The list shows 25 leads at a time, newest first, with parent name and phone,
+participant, grade, credited batch and distributor, status and a same-phone mark; each lead
+opens to its full record with attribution, visit summary and audit trail. Anonymised leads show
+dashes.
+
+It is **read-only**. Status changes, payment recording, commissions, distributor dashboards and
+demo grants are not built; those are later slices with their own authorization. `mongosh` is
+therefore needed only for the smoke-test inspection and cleanup in step 4, not for routine lead
+viewing.
+
 ## What this release does not include
 
-Distributor login, the owner view of leads (planned: `docs/PLAN-OWNER-ACQUISITION-VIEW.md`),
-demo grants, retention purges, and any notification when a lead arrives. Until the owner view
-exists, new leads are read with `mongosh` on `acq_leads` by `createdAt`, or Amit hears from the
-parent over WhatsApp.
+Distributor login, owner writes (status, payment, commission), demo grants, retention purges,
+and any notification when a lead arrives. New leads are seen by opening `/engine/acquisition`
+or when the parent writes on WhatsApp.
