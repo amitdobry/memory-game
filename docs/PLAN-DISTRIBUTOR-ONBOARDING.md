@@ -47,8 +47,8 @@ the approval is a ten-second confirmation of a conversation that has already hap
    יאשר את הבקשה ויחזור אליך ב-WhatsApp." No email or message is sent — none of that exists.
 5. **Approval.** In `/engine/acquisition` (Basic auth, fails closed) a new "Claims" block lists
    pending claims: leaflet, name, phone, email, time. **Approve** runs one transaction: batch
-   → `assignment: distributor`, `distributorId`; claim → `approved`; and, if Amit agrees (§6),
-   leads already credited to that batch get `creditedDistributorId` filled in. **Reject** marks
+   → `assignment: distributor`, `distributorId`; claim → `approved`; and nothing else: leads
+   that batch already produced stay as they are (Amit’s decision, §6). **Reject** marks
    the claim rejected and leaves everything else as it was. Both write audit rows.
 6. **Afterwards.** The distributor sees nothing yet — there is no distributor login or dashboard
    (that is the later slice the recon planned). Amit tells them by WhatsApp that they are set.
@@ -75,7 +75,7 @@ the approval is a ten-second confirmation of a conversation that has already hap
 - **Distributor gains `phone`** (E.164, via the existing `normalizePhone`/`phoneKeyOf`) and a
   `phoneKey` for lookup. Email stays the unique login identifier for the later login slice.
 - **Audit**: `distributor.claim.requested`, `distributor.claim.approved`,
-  `distributor.claim.rejected`, `batch.assigned`, `lead.credit.backfilled` — ids and statuses
+  `distributor.claim.rejected`, `batch.assigned` — ids and statuses
   only; the redaction hook already refuses names, phones and emails.
 - **Migration**: one file, indexes only (`autoIndex` is off), run in the Heroku release phase.
 - The batch setup script is untouched: it still refuses to change an assignment, so a claim
@@ -96,11 +96,9 @@ the approval is a ten-second confirmation of a conversation that has already hap
 
 ## 6. Decisions for Amit before building
 
-1. **Gate:** approval only (recommended), verbal code only, or both?
-2. **Earlier leads:** when a batch is approved to a distributor, credit the leads that batch
-   already produced to them? Recommended **yes** — the leaflet was theirs — recorded as an
-   audited backfill.
-3. **Fields:** name + phone + email, all required? Recommended yes; email is the future login.
+1. **Gate:** approval only. **Decided** (Amit, 19 Sep 2026): the agreement is verbal — hand over a stack, the person registers, Amit approves; 150 ILS per enrolled student.
+2. **Earlier leads:** **no backfill. Decided** (Amit): leads are his; a distributor is credited only for leads that arrive after the batch is allocated to them. Approval changes the batch, never an existing lead.
+3. **Fields:** name, phone, email — all required. **Decided.**
 4. **Gesture:** **five taps on the "פרטים חשובים" label** in the facts section (decided by Amit, 19 Sep 2026), plus a plain link Amit can send. Decided.
 5. **Retention:** distributor contact details are business records kept for the engagement;
    is a written retention line in the form's privacy text enough?
@@ -110,7 +108,7 @@ the approval is a ten-second confirmation of a conversation that has already hap
 | Slice | Where | Content | Size |
 |---|---|---|---|
 | A | LIVE | migration + claim model + distributor phone; claim page GET/POST; switch; limits; offline tests + Mongo-lane tests | ~1 day |
-| B | LIVE | owner Claims block with Approve/Reject; assignment transaction; optional backfill; audit; tests incl. A-cannot-approve-B style isolation | ~½ day |
+| B | LIVE | owner Claims block with Approve/Reject; assignment transaction; audit; tests incl. A-cannot-approve-B style isolation | ~½ day |
 | C | memory-game | five taps on the "פרטים חשובים" label → LIVE claim URL with the remembered code; static tests; published through the workshop repo | ~1 hour |
 | D | release | CI on a `product/**` branch, fast-forward, deploy with the switch off, enable, production check with a **test batch** (created by the batch script, e.g. `TESTCLM`, claimed and rejected), scoped cleanup of that claim and distributor, then the real switch-on | ~½ day |
 
