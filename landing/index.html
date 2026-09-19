@@ -556,7 +556,7 @@ footer a{color:var(--muted);text-decoration:none}
 <section id="details">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">פרטים חשובים</span>
+      <span class="eyebrow" id="facts-label" style="user-select:none;-webkit-user-select:none;touch-action:manipulation">פרטים חשובים</span>
       <h2>קבוצה קטנה. עבודה אמיתית.</h2>
     </div>
     <div class="facts">
@@ -727,6 +727,21 @@ void sendVisit(API_BASE, visitorId, attribution);
    ------------------------------------------------------------------ */
 const waCard = document.getElementById("wa-link");
 waCard.href = whatsappLink(WHATSAPP_NUMBER, attribution);
+
+/* Five taps on the small "פרטים חשובים" label within two seconds open the distributor claim
+   form on LIVE, carrying the leaflet code this page remembers. A person handed a stack of
+   leaflets is told about it; nobody else notices. The form proves nothing by itself — Amit
+   approves each claim — so this is a door, not a lock. docs/PLAN-DISTRIBUTOR-ONBOARDING.md */
+const factsLabel = document.getElementById("facts-label");
+let labelTaps = [];
+factsLabel?.addEventListener("click", () => {
+  const now = Date.now();
+  labelTaps = labelTaps.filter((t) => now - t < 2000).concat(now);
+  if (labelTaps.length < 5) return;
+  labelTaps = [];
+  const query = attribution?.kind === "ref" ? `?ref=${encodeURIComponent(attribution.code)}` : attribution?.kind === "batch" ? `?b=${encodeURIComponent(attribution.number)}` : "";
+  location.href = `${API_BASE}/distributor/claim${query}`;
+});
 
 /* ------------------------------------------------------------------
    The registration form.

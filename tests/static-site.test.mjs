@@ -140,6 +140,17 @@ test("the space memory-game example keeps its exact configuration URL, absolute 
   assert.ok(m[1].endsWith("Iteg15LXnteoINeU15bXntefLiDXoteV15Mg16HXmdeR15XXkT8ifQ"), "fragment end");
 });
 
+test("landing: five taps on the facts label open the distributor claim form on LIVE with the remembered code", () => {
+  assert.match(landing, /<span class="eyebrow" id="facts-label"[^>]*>פרטים חשובים<\/span>/);
+  const code = withoutComments(landing);
+  assert.match(code, /getElementById\("facts-label"\)/);
+  assert.match(code, /now - t < 2000/);
+  assert.match(code, /labelTaps\.length < 5\) return;/);
+  assert.match(code, /\$\{API_BASE\}\/distributor\/claim\$\{query\}/);
+  assert.match(code, /\?ref=\$\{encodeURIComponent\(attribution\.code\)\}/);
+  assert.match(code, /\?b=\$\{encodeURIComponent\(attribution\.number\)\}/);
+});
+
 test("index.html avoids slash-heavy gendered forms in visible copy", () => {
   const visible = withoutCode(landing);
   for (const form of ["הילד/ה", "שלו/ה", "משיק/ה", "התלמיד/ה", "מציג/ה"]) {
