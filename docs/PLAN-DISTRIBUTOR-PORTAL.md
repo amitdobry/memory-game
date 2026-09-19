@@ -4,7 +4,16 @@ Written 19 September 2026, after the claim flow went live (see PLAN-DISTRIBUTOR-
 What Amit asked for: right after he presses **Approve**, a paste-ready WhatsApp message that says
 "approved, here is your link"; a personal link the distributor keeps and opens whenever they want
 to see how their leaflet is doing; and a grand view of all distributors for Amit. All on LIVE.
-**Nothing here is implemented yet.**
+
+**Status, 19 September 2026 (afternoon): implemented and live.** LIVE `54636a4` (Heroku v88; CI #178 on
+the feature branch and #179 on `product/web-v0`, both green including the Mongo lane; migration
+`20260919150000` applied); `DISTRIBUTOR_PORTAL_ENABLED=1` set in v89. Built as planned with Amit’s
+decisions (§8): key link, no money line, grade and status visible, three colour groups. The lead status
+control, enrolment, “mark paid” and the commission ledger (slice B) shipped in the same release. The
+write paths were proven in CI’s Mongo lane; in production only the switch, the unknown-key answer and
+the credential in front of the owner writes were checked, so no synthetic records were created.
+Amit’s own LEAF6 distributor record predates the link: he issues his link with “Issue link” on his
+distributor page.
 
 ## 1. The link: a personal key, not a password
 
