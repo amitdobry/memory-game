@@ -240,7 +240,10 @@ textarea{min-height:92px;resize:vertical}
 .form-msg.info{display:block;background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.35);color:var(--cyan-soft)}
 [aria-invalid="true"]{border-color:rgba(248,113,113,.7)!important}
 .privacy{background:rgba(4,8,22,.5);border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:.9rem;color:var(--muted)}
-.privacy>b{color:var(--ink);display:block;margin-bottom:6px}
+.privacy>p{margin:0;color:var(--ink)}
+.privacy details{margin-top:8px}
+.privacy summary{cursor:pointer;color:var(--ink);font-weight:600;padding:2px 0}
+.privacy details ul{margin-top:8px}
 .privacy ul{margin:0;padding-inline-start:18px;display:grid;gap:5px}
 .privacy li b{color:var(--ink);font-weight:700}
 .consent{display:flex;gap:12px;align-items:flex-start;cursor:pointer;color:var(--ink);font-size:.95rem;line-height:1.5}
@@ -525,7 +528,7 @@ footer a{color:var(--muted);text-decoration:none}
     <div class="games">
       <!-- A finished example game. The whole configuration travels in the URL fragment
            (play.html decodes it), so this needs no server, no login and no AI call. -->
-      <a class="game" id="preview-link" href="play.html?by=%D7%94%D7%A1%D7%93%D7%A0%D7%94#eyJtb2RlIjoic29sbyIsImNsYXVkZVNraWxsIjoibm9ybWFsIiwicGxheWVyMU5hbWUiOiLXqdeX16fXnyAxIiwicGxheWVyMk5hbWUiOiLXqdeX16fXnyAyIiwiY2xhdWRlVGFsa3MiOmZhbHNlLCJ0aXRsZSI6Itee16nXl9enINeW15nXm9eo15XXnyDXkdeX15zXnCIsImNvbHMiOjQsInJvd3MiOjQsImNhcmRTZXQiOiJzcGFjZSIsImN1c3RvbVN5bWJvbHMiOltdLCJ0aW1lclNlY29uZHMiOjkwLCJwZWVrU2Vjb25kcyI6MCwiZmxpcEJhY2tNcyI6MTAwMCwiZGlmZmljdWx0eVJhbXAiOiJub25lIiwicG9pbnRzUGVyTWF0Y2giOjEwLCJwZW5hbHR5UGVyTWlzcyI6MCwic3BlZWRCb251cyI6ZmFsc2UsInNob3dTdGF0cyI6dHJ1ZSwidGhlbWUiOiJzcGFjZSIsInNob3dUaW1lciI6dHJ1ZSwic2hvd1Njb3JlIjp0cnVlLCJzb3VuZCI6ZmFsc2UsIndpbk1lc3NhZ2UiOiLXoNeZ16bXl9eq150hINeb15wg15TXlteV15LXldeqINeg157XpteQ15UiLCJsb3NlTWVzc2FnZSI6Iteg15LXnteoINeU15bXntefLiDXoteV15Mg16HXmdeR15XXkT8ifQ" target="_blank" rel="noopener">
+      <a class="game" id="preview-link" href="https://amitdobry.github.io/memory-game/play.html?by=%D7%94%D7%A1%D7%93%D7%A0%D7%94#eyJtb2RlIjoic29sbyIsImNsYXVkZVNraWxsIjoibm9ybWFsIiwicGxheWVyMU5hbWUiOiLXqdeX16fXnyAxIiwicGxheWVyMk5hbWUiOiLXqdeX16fXnyAyIiwiY2xhdWRlVGFsa3MiOmZhbHNlLCJ0aXRsZSI6Itee16nXl9enINeW15nXm9eo15XXnyDXkdeX15zXnCIsImNvbHMiOjQsInJvd3MiOjQsImNhcmRTZXQiOiJzcGFjZSIsImN1c3RvbVN5bWJvbHMiOltdLCJ0aW1lclNlY29uZHMiOjkwLCJwZWVrU2Vjb25kcyI6MCwiZmxpcEJhY2tNcyI6MTAwMCwiZGlmZmljdWx0eVJhbXAiOiJub25lIiwicG9pbnRzUGVyTWF0Y2giOjEwLCJwZW5hbHR5UGVyTWlzcyI6MCwic3BlZWRCb251cyI6ZmFsc2UsInNob3dTdGF0cyI6dHJ1ZSwidGhlbWUiOiJzcGFjZSIsInNob3dUaW1lciI6dHJ1ZSwic2hvd1Njb3JlIjp0cnVlLCJzb3VuZCI6ZmFsc2UsIndpbk1lc3NhZ2UiOiLXoNeZ16bXl9eq150hINeb15wg15TXlteV15LXldeqINeg157XpteQ15UiLCJsb3NlTWVzc2FnZSI6Iteg15LXnteoINeU15bXntefLiDXoteV15Mg16HXmdeR15XXkT8ifQ" target="_blank" rel="noopener">
         <div class="art">★ ★ ?</div>
         <span class="tag">דוגמה 01</span>
         <h3>משחק הזיכרון</h3>
@@ -610,19 +613,21 @@ footer a{color:var(--muted);text-decoration:none}
         </div>
 
         <div class="privacy" id="privacy">
-          <b>מה קורה לפרטים</b>
-          <ul>
-            <li><b>מה נשמר:</b> שם ההורה, טלפון, אימייל אם נמסר, שם התלמיד, כיתה, וההערה שכתבתם.</li>
-            <li><b>למה:</b> כדי שעמית יחזור אליכם בעניין הסדנה. לא לדיוור ולא לשום דבר אחר.</li>
-            <li><b>מאיפה הגעתם:</b> נשמר גם מאיזה עלון או קוד הפניה הגעתם לאתר.</li>
-            <li><b>מפיצי העלונים</b> עשויים לראות בעתיד מידע מוגבל בלבד: מאיזה עלון הגיעה הרשמה ומה מצבה. בלי פרטי קשר ובלי שם התלמיד.</li>
-            <li><b>מחיקה:</b> כדי למחוק את הפרטים כתבו לעמית ב-WhatsApp, במספר שלמטה.</li>
-          </ul>
+          <p>הפרטים שתמלאו יישמרו כדי שעמית יוכל לחזור אליכם בנוגע לסדנה.</p>
+          <details>
+            <summary>פרטים נוספים על פרטיות</summary>
+            <ul>
+              <li><b>מה נשמר:</b> שם ההורה, טלפון, אימייל אם נמסר, שם התלמיד, כיתה, וההערה שכתבתם.</li>
+              <li><b>מאיפה הגעתם:</b> נשמר גם מאיזה עלון או קוד הפניה הגעתם לאתר.</li>
+              <li><b>מפיצי העלונים</b> עשויים לראות בעתיד מידע מוגבל בלבד: מאיזה עלון הגיעה הרשמה ומה מצבה. בלי פרטי קשר ובלי שם התלמיד.</li>
+              <li><b>מחיקה:</b> כדי למחוק את הפרטים כתבו לעמית ב-WhatsApp, במספר שלמטה.</li>
+            </ul>
+          </details>
         </div>
 
         <label class="consent" for="f-consent">
           <input id="f-consent" name="consent" type="checkbox">
-          <span>קראתי מה נשמר ולמה, ואני מאשר או מאשרת שעמית ייצור איתי קשר בעניין הסדנה.</span>
+          <span>אני מאשר/ת שמירת הפרטים ויצירת קשר בנוגע לסדנה.</span>
         </label>
 
         <button class="btn btn-primary" id="submit-btn" type="submit" style="width:100%;border:0">שלחו פרטים</button>

@@ -99,7 +99,9 @@ test("index.html registration form: explicit phone, unchecked consent, privacy t
   assert.match(markup, /<input id="f-phone" name="parentPhone" type="tel"[^>]*required/);
   assert.match(markup, /<input id="f-consent" name="consent" type="checkbox">/);
   assert.doesNotMatch(markup, /name="consent"[^>]*checked/);
-  for (const line of ["מה נשמר", "כדי שעמית יחזור אליכם", "מאיזה עלון או קוד הפניה", "מפיצי העלונים", "מחיקה"]) {
+  assert.match(markup, /<div class="privacy" id="privacy">\s*<p>הפרטים שתמלאו יישמרו כדי שעמית יוכל לחזור אליכם בנוגע לסדנה\.<\/p>\s*<details>\s*<summary>פרטים נוספים על פרטיות<\/summary>/);
+  assert.match(markup, /<span>אני מאשר\/ת שמירת הפרטים ויצירת קשר בנוגע לסדנה\.<\/span>/);
+  for (const line of ["מה נשמר", "מאיזה עלון או קוד הפניה", "מפיצי העלונים", "מחיקה"]) {
     assert.ok(markup.includes(line), `privacy text is missing: ${line}`);
   }
   // No invented retention period and no compliance claim inside the privacy text itself.
@@ -125,6 +127,13 @@ test("index.html carries the original hero wording, the approved lesson 6 and th
   assert.match(landing, /לכל משתתף יש רעיון למשחק משלו ותוכנית ברורה: איך משחקים, איך מנצחים ומה בונים קודם\./);
   assert.match(landing, /<label for="f-student">שם התלמיד<\/label>/);
   assert.doesNotMatch(landing, /או כינוי|לא צריך שם מלא|אין שמירה של פרטים/);
+});
+
+test("the space memory-game example keeps its exact configuration URL, absolute so it works from /workshop/ too", () => {
+  const m = /id="preview-link" href="([^"]+)"/.exec(landing);
+  assert.ok(m, "preview link present");
+  assert.ok(m[1].startsWith("https://amitdobry.github.io/memory-game/play.html?by=%D7%94%D7%A1%D7%93%D7%A0%D7%94#eyJtb2RlIjoic29sbyIs"), m[1]);
+  assert.ok(m[1].endsWith("Iteg15LXnteoINeU15bXntefLiDXoteV15Mg16HXmdeR15XXkT8ifQ"), "fragment end");
 });
 
 test("index.html avoids slash-heavy gendered forms in visible copy", () => {

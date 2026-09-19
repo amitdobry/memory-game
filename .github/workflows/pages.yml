@@ -39,3 +39,21 @@ jobs:
           path: public
       - id: deployment
         uses: actions/deploy-pages@v4
+
+      # The same landing page is also served at https://amitdobry.github.io/workshop/ by
+      # the amitdobry/workshop repository, whose workflow rebuilds it from this repo. That
+      # workflow polls every 15 minutes on its own; with a token it can be told at once.
+      # The token is optional: a fine-grained PAT for the workshop repository only, with
+      # Contents: read and write, stored here as the secret WORKSHOP_PUBLISH_TOKEN. Without
+      # it this step does nothing and the poll carries the update.
+      - name: Tell amitdobry/workshop to publish now (only when a token is configured)
+        env:
+          TOKEN: ${{ secrets.WORKSHOP_PUBLISH_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "no WORKSHOP_PUBLISH_TOKEN; the workshop repo will pick this up on its schedule"; exit 0; fi
+          curl -fsS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $TOKEN" \
+            https://api.github.com/repos/amitdobry/workshop/dispatches \
+            -d '{"event_type":"memory-game-updated"}'
+          echo "dispatched"
