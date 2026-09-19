@@ -2,8 +2,16 @@
 
 Written 19 September 2026 after Amit described the flow he wants: a distributor receives a
 stack of leaflets, scans the QR code, taps the small "פרטים חשובים" label on the landing page five times (Amit’s choice, 19 Sep), fills in a
-short form (name, phone, email) on LIVE, and that batch becomes theirs. **Nothing here is
-implemented.** Six batches (LEAF1–LEAF6) exist, all `unassigned`; six QR codes exist in `qr/`.
+short form (name, phone, email) on LIVE, and that batch becomes theirs.
+
+**Status, 19 September 2026 (evening): implemented and live.** LIVE `808abb1` (Heroku v84, CI #173
+on the feature branch and #174 on `product/web-v0`, both green including the Mongo lane; migration
+`20260919120000` applied); `DISTRIBUTOR_CLAIMS_ENABLED=1` set in v85; memory-game `52d0a59` carries
+the five-tap gesture and is published through the workshop repo. Verified in production read-only:
+the form renders for all six codes and both spellings, refuses no code and unknown codes, and the
+owner decision answers 401 without the credential. The write path (claim → approve/reject, one claim
+per batch, no backfill, later leads credited) was proven in CI’s Mongo lane, not by writing to
+production. Six batches (LEAF1–LEAF6) remain `unassigned` until someone claims and Amit approves.
 
 ## 1. The one thing the gesture cannot be
 
