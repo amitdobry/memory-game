@@ -107,8 +107,20 @@ marks it paid. Each step is one click on the lead's page and one audit row.
 A first: it is what Amit asked for word for word. B makes the funnel move. Nothing in memory-game
 changes; the landing page is untouched.
 
-## 8. Decisions for Amit
+## 8. Decisions (Amit, 19 Sep 2026)
 
-1. Personal link (recommended) or email+password? The link can be swapped for a password later.
-2. The WhatsApp wording above, including the 150 ₪ line — keep, change, or drop the money line?
-3. Distributor page shows grade and status of each registration — fine, or counts only?
+1. **Personal link with a key.** Decided.
+2. **WhatsApp wording without the money line.** The 150 ₪ sentence is dropped; the agreement stays verbal.
+3. **Distributors see grade and status per registration**, not counts only.
+4. **Status groups, shown as colours with the substatus on hover:**
+   - **Active (green):** submitted, contacted, trial_booked, enrolled (unpaid).
+   - **Closed (gray):** not_interested, invalid_contact, duplicate.
+   - **Paid (blue):** enrolled and the enrolment is fully paid — the final state, the moment the distributor is owed. It does not mean the course is finished.
+   The lead keeps its detailed status; the group is derived from it and from the enrolment's payment date. `callback` and `waitlist` are not added for now.
+
+The WhatsApp text becomes:
+
+> שלום {שם}, אישרתי אותך כמפיץ/ה של עלון {מספר} של הסדנה "בונים עם AI". תודה!
+> זה הקישור האישי שלך למעקב אחרי ההרשמות שמגיעות מהעלון: {קישור}
+> הקישור אישי – לא להעביר אותו.
+> עמית
