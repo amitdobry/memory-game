@@ -4,41 +4,13 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>סדנת AI — מי אתם?</title>
-    <link rel="stylesheet" href="css/app.css" />
+    <!-- The picker lived here from 18 to 19 September 2026 while the landing page held
+         the root. It is back at the root; this address keeps working by forwarding. -->
+    <meta http-equiv="refresh" content="0; url=./" />
+    <script>location.replace("./" + location.search + location.hash);</script>
     <link rel="icon" href="avatars/babydragon.webp" />
   </head>
   <body>
-    <main class="pick">
-      <header>
-        <h1 class="pick__title">בונים משחק עם AI</h1>
-        <p class="pick__subtitle">בחרו את השם שלכם כדי להיכנס למשחק שלכם</p>
-      </header>
-
-      <div class="pick__grid" id="grid"></div>
-    </main>
-
-    <script type="module">
-      import { USERS } from "./js/users.js";
-
-      const grid = document.getElementById("grid");
-
-      for (const user of USERS) {
-        const card = document.createElement("a");
-        card.className = "pick__card" + (user.isInstructor ? " pick__card--instructor" : "");
-        card.href = `build.html?u=${encodeURIComponent(user.id)}`;
-        card.style.color = user.color;
-
-        const img = document.createElement("img");
-        img.src = `avatars/${user.avatar}`;
-        img.alt = "";
-
-        const name = document.createElement("div");
-        name.className = "pick__name";
-        name.textContent = user.name;
-
-        card.append(img, name);
-        grid.append(card);
-      }
-    </script>
+    <p dir="rtl"><a href="./">בונים משחק עם AI — בחרו את השם שלכם</a></p>
   </body>
 </html>

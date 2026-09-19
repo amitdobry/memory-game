@@ -51,8 +51,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC = path.join(ROOT, "public");
 const read = (rel) => fs.readFileSync(path.join(PUBLIC, rel), "utf8");
 
-const landing = read("index.html");
-const picker = read("workshop.html");
+// The parents’ landing page has its own source, outside public/: amitdobry/workshop publishes
+// it at https://amitdobry.github.io/workshop/ as index.html with public/js beside it.
+const LANDING = path.join(ROOT, "landing", "index.html");
+const landing = fs.readFileSync(LANDING, "utf8");
+const picker = read("index.html");
+const forwarder = read("workshop.html");
 /** Markup only: no <script>, no <style>, no HTML/CSS/JS comments. */
 const withoutCode = (html) =>
   html.replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
@@ -178,7 +182,8 @@ for (const page of ["index.html", "workshop.html", "build.html", "play.html"]) {
 // workshop.html — the classroom picker, moved from index.html
 // ---------------------------------------------------------------------------
 
-test("workshop.html is the picker and still offers the three children", () => {
+test("index.html is the classroom picker again and still offers the three children", () => {
+  assert.match(picker, /<title>סדנת AI — מי אתם\?<\/title>/);
   assert.match(picker, /import \{ USERS \} from ".\/js\/users.js"/);
   assert.match(picker, /build\.html\?u=/);
   const children = USERS.filter((u) => !u.isInstructor);
@@ -186,13 +191,30 @@ test("workshop.html is the picker and still offers the three children", () => {
   assert.ok(USERS.some((u) => u.isInstructor), "the instructor entry is still there");
 });
 
-test("no page or script in public/ still sends anyone to index.html as the picker", () => {
-  const files = fs.readdirSync(path.join(PUBLIC, "js")).map((f) => path.join("js", f))
-    .concat(["workshop.html", "build.html", "play.html"]);
-  for (const rel of files) {
-    assert.equal(withoutComments(read(rel)).includes("index.html"), false, `${rel} still references index.html`);
-  }
+test("index.html forwards a leaflet visit (?ref= or ?b=) to the landing page with its query, and nothing else", () => {
+  const code = withoutComments(picker);
+  assert.match(code, /if \(!q\.has\("ref"\) && !q\.has\("b"\)\) return;/);
+  assert.match(code, /"\/workshop\/"/);
+  assert.match(code, /location\.replace\(target \+ location\.search \+ location\.hash\)/);
+  // The forwarder runs in the head, before the picker is drawn.
+  assert.ok(code.indexOf("location.replace(target") < code.indexOf("<body>"), "forwarder must run before the body");
+  // The landing page itself never forwards: no loop between the two addresses.
+  assert.doesNotMatch(withoutComments(landing), /location\.replace\(target|"\/landing\/"/);
+});
+
+test("workshop.html keeps working by forwarding to the picker at the root", () => {
+  assert.match(forwarder, /http-equiv="refresh" content="0; url=\.\/"/);
+  assert.match(forwarder, /location\.replace\(".\/" \+ location\.search \+ location\.hash\)/);
+  assert.match(forwarder, /<a href="\.\/">/);
   assert.match(read("js/build.js"), /location\.replace\("workshop\.html"\)/);
+});
+
+test("landing/index.html: every module it imports exists in public/js, and it references nothing else locally", () => {
+  const refs = [...landing.matchAll(/from "\.\/(js\/[^"]+)"/g)].map((m) => m[1]);
+  assert.ok(refs.length >= 3, "expected module imports");
+  for (const ref of refs) assert.ok(fs.existsSync(path.join(PUBLIC, ref)), `landing imports missing ${ref}`);
+  const other = [...withoutCode(landing).matchAll(/\s(?:href|src)="([^"#][^"]*)"/g)].map((m) => m[1]).filter((r) => !/^(https?:|data:|mailto:|tel:)/.test(r));
+  assert.deepEqual(other, [], "the landing page must only reference absolute URLs besides its modules");
 });
 
 test("build.js stops executing after redirecting away", () => {

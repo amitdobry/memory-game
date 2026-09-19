@@ -20,6 +20,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public");
+const LANDING_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "landing");
 const PORT = Number(process.env.PORT ?? 3000);
 
 const MIME = {
@@ -40,11 +41,21 @@ const server = http.createServer((req, res) => {
   }
 
   const url = new URL(req.url, "http://localhost");
-  const rel = decodeURIComponent(url.pathname) === "/" ? "/index.html" : decodeURIComponent(url.pathname);
-  const filePath = path.join(PUBLIC_DIR, rel);
+  let rel = decodeURIComponent(url.pathname) === "/" ? "/index.html" : decodeURIComponent(url.pathname);
 
-  // Never serve anything outside public/.
-  if (!filePath.startsWith(PUBLIC_DIR)) {
+  // /landing/ previews the parents’ landing page exactly as amitdobry/workshop publishes
+  // it: landing/index.html at the root of that site, with public/js beside it.
+  let root = PUBLIC_DIR;
+  if (rel === "/landing" || rel === "/landing/" || rel === "/landing/index.html") {
+    root = LANDING_DIR;
+    rel = "/index.html";
+  } else if (rel.startsWith("/landing/js/")) {
+    rel = rel.slice("/landing".length);
+  }
+  const filePath = path.join(root, rel);
+
+  // Never serve anything outside public/ (or landing/index.html).
+  if (!filePath.startsWith(root)) {
     res.writeHead(403).end("forbidden");
     return;
   }
@@ -71,7 +82,7 @@ server.listen(PORT, () => {
     .map((n) => n.address);
 
   console.log("\n  🎮  סדנת AI לילדים — אתר סטטי\n");
-  console.log(`  על המחשב הזה:   http://localhost:${PORT}`);
+  console.log(`  על המחשב הזה:   http://localhost:${PORT}   (דף הנחיתה: /landing/)`);
   for (const ip of lan) console.log(`  מהטלפון/טאבלט: http://${ip}:${PORT}`);
   console.log("\n  ה-AI רץ בשרת נפרד (LIVE). ראו public/js/api.js\n");
 });

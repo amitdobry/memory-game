@@ -45,10 +45,12 @@ cd ../Live && WORKSHOP_OWNER_PASSWORD="pick-something" LIVE_ALLOWED_ORIGINS="htt
 npm start
 ```
 
-Then open http://localhost:3000/workshop.html, pick a child, and when the Firekeeper
+Then open http://localhost:3000/, pick a child, and when the Firekeeper
 asks for the password type the owner password (or an eight-digit code minted with it
 — see *The door* below). `npm start` also prints a LAN address that phones and tablets
-on the same wifi can use. http://localhost:3000/ is the public landing page.
+on the same wifi can use. http://localhost:3000/landing/ previews the public landing page
+exactly as it is published at https://amitdobry.github.io/workshop/ (source: `landing/index.html`;
+the `amitdobry/workshop` repository rebuilds it from here, nothing is edited there).
 
 ---
 
@@ -56,8 +58,9 @@ on the same wifi can use. http://localhost:3000/ is the public landing page.
 
 | Page | What it does | Needs a server? |
 |---|---|---|
-| `/` | The public landing page for parents: what the workshop is, the ten meetings, a WhatsApp contact | no |
-| `/workshop.html` | Pick your name (3 children + an instructor, hard-coded) — the classroom entry | no |
+| `/` | Pick your name (3 children + an instructor, hard-coded) — the classroom entry. A visit carrying `?ref=` or `?b=` (a leaflet link) is forwarded to the landing page | no |
+| `/workshop.html` | Forwards to `/` (the picker lived here for a day) | no |
+| `landing/index.html` | The public landing page for parents, published at https://amitdobry.github.io/workshop/ by the `workshop` repository; preview locally at `/landing/` | no |
 | `/build.html?u=kid1` | The workbench: game + AI chat + control panel + code view | only for the AI panel |
 | `/play.html#<code>` | Somebody's finished game, whole config packed into the URL | **no** |
 
