@@ -1,13 +1,13 @@
 # Plan — distributor self-onboarding from the leaflet
 
 Written 19 September 2026 after Amit described the flow he wants: a distributor receives a
-stack of leaflets, scans the QR code, uses a hidden gesture on the landing page, fills in a
+stack of leaflets, scans the QR code, taps the landing page’s logo five times (Amit’s choice, 19 Sep), fills in a
 short form (name, phone, email) on LIVE, and that batch becomes theirs. **Nothing here is
 implemented.** Six batches (LEAF1–LEAF6) exist, all `unassigned`; six QR codes exist in `qr/`.
 
 ## 1. The one thing the gesture cannot be
 
-The QR URL is public the moment a leaflet is on a noticeboard. A triple-tap is a convenience,
+The QR URL is public the moment a leaflet is on a noticeboard. A five-tap is a convenience,
 not a secret: a curious parent or child will find it, and whoever submits the form first
 would own the batch and every commission credited to it. So the design rule is:
 
@@ -26,10 +26,10 @@ the approval is a ten-second confirmation of a conversation that has already hap
 ## 2. The flow, step by step
 
 1. **Handover.** Amit gives the distributor their stack (say LEAF3) and says: scan the code,
-   tap the logo three times, fill in your details. He can also send them the direct link
+   tap the logo five times, fill in your details. He can also send them the direct link
    (§3) on WhatsApp, so the gesture is never the only way in.
-2. **Landing page** (`/workshop/?ref=LEAF3`). Three taps on the header logo "בונים עם AI"
-   within about a second and a half navigate to LIVE:
+2. **Landing page** (`/workshop/?ref=LEAF3`). Five taps on the header logo "בונים עם AI"
+   within about two seconds navigate to LIVE:
    `https://live-intelligence-f6ec7b9df867.herokuapp.com/distributor/claim?ref=LEAF3`.
    The code comes from the page's remembered attribution, so a distributor who scanned on
    Sunday and taps on Monday still claims the right batch. Anything else about the page is
@@ -100,7 +100,7 @@ the approval is a ten-second confirmation of a conversation that has already hap
    already produced to them? Recommended **yes** — the leaflet was theirs — recorded as an
    audited backfill.
 3. **Fields:** name + phone + email, all required? Recommended yes; email is the future login.
-4. **Gesture:** three taps on the logo, plus a plain link Amit can send. Any other preference?
+4. **Gesture:** ~~three~~ **five taps on the logo** (decided by Amit, 19 Sep 2026), plus a plain link Amit can send.
 5. **Retention:** distributor contact details are business records kept for the engagement;
    is a written retention line in the form's privacy text enough?
 
@@ -110,7 +110,7 @@ the approval is a ten-second confirmation of a conversation that has already hap
 |---|---|---|---|
 | A | LIVE | migration + claim model + distributor phone; claim page GET/POST; switch; limits; offline tests + Mongo-lane tests | ~1 day |
 | B | LIVE | owner Claims block with Approve/Reject; assignment transaction; optional backfill; audit; tests incl. A-cannot-approve-B style isolation | ~½ day |
-| C | memory-game | triple-tap on the logo → LIVE claim URL with the remembered code; static tests; published through the workshop repo | ~1 hour |
+| C | memory-game | five taps on the logo → LIVE claim URL with the remembered code; static tests; published through the workshop repo | ~1 hour |
 | D | release | CI on a `product/**` branch, fast-forward, deploy with the switch off, enable, production check with a **test batch** (created by the batch script, e.g. `TESTCLM`, claimed and rejected), scoped cleanup of that claim and distributor, then the real switch-on | ~½ day |
 
 Order A → B → C → D. C is harmless to ship early only if LIVE already answers the claim URL;
