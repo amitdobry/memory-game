@@ -325,10 +325,13 @@ page ends and the picker begins.
 - Form: a hidden `groupId` set by the card; the `note` label unchanged; submit refuses with the
   existing field-naming message when a group exists but none is chosen ("מועד"). If the GET fails
   or returns no open groups, the section is hidden and the form works as today (groupId omitted;
-  the portal later says the date will be agreed with Amit).
-- Success message gains the portal link: "הקישור האישי שלכם לפרטי ההרשמה ולמועדים: … שמרו אותו."
-  plus a "שלחו לעצמכם ב-WhatsApp" link (`wa.me/?text=`). The link is also kept in
-  `localStorage.acq_portal_<leadRef>` so a reload of the page can show it again.
+  Amit agrees the date by phone, exactly as today).
+- **Increment 1 success message**: as today, plus the chosen group by name — "ההרשמה נקלטה לקבוצת
+  ימי שישי. עמית יחזור אליכם בטלפון או ב-WhatsApp." (or "…לרשימת ההמתנה של קבוצת…"). It mentions
+  nothing that does not exist yet.
+- **Increment 2 only**: the success message gains the portal link ("הקישור האישי שלכם לפרטי ההרשמה
+  ולמועדים: … שמרו אותו."), a "שלחו לעצמכם ב-WhatsApp" link, and the link is kept in
+  `localStorage.acq_portal_<leadRef>` so a reload can show it again.
 - The hard-coded schedule copy ("ימי שישי", "10:00–12:00", hero chip "ימי שישי") is replaced by
   text rendered from the same GET, with the current wording as the no-JS/offline fallback.
 - Static tests: payload key set gains `groupId`; `schedule.js` unit tests (month layout, RTL
@@ -522,19 +525,29 @@ in registration order.
 
 ## 15. Deployment strategy
 
-1. LIVE first, behind switches: the migration creates the collections; `GET /api/acquisition/groups`
-   returns an empty list until Amit creates and opens a group, so the picker stays hidden;
-   `PARENT_PORTAL_ENABLED` off until the memory-game page can show the link.
-2. Amit creates the two groups in `/engine/acquisition/groups` and enters the meetings (in draft).
-3. memory-game: publish the picker (it shows nothing until a group is `open`); verify the page.
-4. Amit opens the groups → the cards appear within the 60-second cache. Set
-   `PARENT_PORTAL_ENABLED=1`.
-5. Rollback: `heroku releases:rollback` for LIVE (the optional fields are ignored by the old
-   code; the new collections are inert); the previous memory-game commit republishes through
-   the workshop repo. Order matters only one way: the page must never be published before LIVE
-   accepts `groupId`, or registrations from the new page would be refused as `invalid_request`.
+**Increment 1** (a complete product on its own):
 
----
+1. LIVE first: the migration creates `acq_groups`; `GET /api/acquisition/groups` returns an empty
+   list until a group is `open`, so the picker stays hidden and the page behaves exactly as today.
+2. Amit creates the two groups in `/engine/acquisition/groups` and enters every meeting (in draft).
+3. memory-game: publish the picker (it shows nothing while no group is open); verify the page.
+4. Amit opens the groups → the cards appear within the 60-second cache. Smoke test one synthetic
+   registration with a group (and one waitlist registration against a group whose capacity is set to
+   the paid count), remove them by id with the scoped cleanup.
+5. Demonstrate the whole journey to Amit (§17a). Rollback: `heroku releases:rollback` (the optional
+   fields are ignored by the old code; the new collection is inert); the previous memory-game commit
+   republishes through the workshop repo. Order matters one way only: the page must never be
+   published before LIVE accepts `groupId` and `waitlist`, or registrations from the new page
+   would be refused as `invalid_request`.
+
+**Increment 2** (optional, only after Amit approves increment 1):
+
+6. LIVE behind `PARENT_PORTAL_ENABLED` (off): migration adds `acq_messages` and the token index; the
+   201 response does not carry `portalUrl` while the switch is off, so the live page changes nothing.
+7. memory-game: the success message shows the link only when the response carries one.
+8. Enable the switch; one synthetic registration end to end (link, page, message both ways); scoped
+   cleanup extended to messages and the token. Rollback: unset the switch — the page is back to
+   increment 1 behaviour with no other change.
 
 ## 16. Risks and open questions
 
@@ -595,6 +608,30 @@ messages collection, no `portalUrl`), and increment 2 has its own migration and 
 
 ---
 
+## 17a. Increment-1 product completeness rule (Amit, 20 Sep 2026)
+
+Increment 1 is a **standalone production product**, not infrastructure waiting for increment 2.
+At its end this journey must work with no parent portal at all:
+
+`Leaflet → landing page → view groups and dates → choose a group → register → the registration
+reaches /engine/acquisition → Amit manages the lead → records full payment → the seat is secured →
+public availability updates → a full group disables normal registration → the waitlist stays open.`
+
+Rules:
+
+- No loose ends, placeholder behaviour, broken links, "coming soon" copy, temporary data-model
+  assumptions, or operational step that depends on increment 2. Nothing a parent or Amit sees may
+  refer to a portal, a personal link, messages or a countdown.
+- Increment 2 is genuinely optional. If it is never built, increment 1 remains a coherent,
+  maintainable, fully usable registration product; Amit talks to parents on WhatsApp as he does now.
+- The plan's increment-1 sections are written for that reading; where a sentence was drafted with
+  the portal in mind (§7, §15), it now says which increment it belongs to.
+- **Demonstration**: at the end of increment 1 the complete journey is shown to Amit visually
+  (phone and desktop screenshots of the picker, the calendar, the registration success, the owner
+  pages) and operationally (a synthetic registration, payment recorded, seat secured, availability
+  changed, group filled, waitlist registration, then scoped cleanup). Only after Amit reviews and
+  approves increment 1 do we decide whether increment 2 exists.
+
 ## 18. Ordered implementation checklist
 
 **Increment 1**
@@ -635,6 +672,8 @@ messages collection, no `portalUrl`), and increment 2 has its own migration and 
   a full group's card is disabled and offers the waitlist; a waitlist registration is stored with
   `waitlisted: true`, shown as such to Amit, and cannot be marked paid while the group is full.
 - Old leads and enrolments render unchanged; no data migration ran.
+- The complete journey of §17a has been demonstrated to Amit visually and operationally, and
+  nothing a parent or Amit sees mentions a portal, a personal link, messages or a countdown.
 - All CI jobs green; static checks green; release recorded in the checklist.
 
 **Increment 2**
