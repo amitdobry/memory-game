@@ -6,10 +6,15 @@
 //   /api/acquisition/visit   {visitorId, ref?|b?}          → 202 {ok, recognised}
 //   /api/acquisition/lead    {contact fields, consent,      → 201 {ok, leadRef, replay:false}
 //                             idempotencyKey, visitorId?,     200 {ok, leadRef, replay:true}
-//                             ref?|b?}                        400 {error:'invalid_request', fields}
+//                             groupId?, waitlist?, ref?|b?}   400 {error:'invalid_request', fields}
 //                                                             409 {error:'idempotency_conflict'}
+//                                                             409 {error:'group_full'}
 //                                                             429 {error:'rate_limited'}
 //                                                             503 {error:'acquisition_unavailable'}
+//
+// The groups themselves — which are open, when they meet and how many places are left — come from
+// GET /api/acquisition/groups and live in `schedule.js`. Choosing a group reserves nothing: a
+// place is secured when Amit records the payment.
 //
 // What this file never does: store a name, phone, email or note anywhere in the browser (only
 // the random visitor id and the leaflet attribution are remembered), put contact details in a
@@ -79,6 +84,7 @@ export const FIELD_LABELS = {
   grade: "כיתה",
   note: "ההערה",
   consent: "אישור יצירת הקשר",
+  groupId: "מועד",
 };
 
 // --- the visitor id ---------------------------------------------------------
@@ -147,23 +153,37 @@ export function fingerprint(values) {
   return JSON.stringify([n.parentName, n.parentPhone.replace(/\D/g, ""), (n.parentEmail ?? "").toLowerCase(), n.participantFirstName, n.grade, n.note ?? ""]);
 }
 
-/** Which fields the form itself can see are missing. Server validation is the real check. */
-export function missingFields(values) {
+/**
+ * Which fields the form itself can see are missing. Server validation is the real check.
+ *
+ * `requireGroup` is true only while the page is actually offering groups: when none is open the
+ * picker is not drawn, the registration carries no group, and asking for one would be asking for
+ * something that is not on the page.
+ */
+export function missingFields(values, { requireGroup = false } = {}) {
   const n = normalizeForm(values);
   const missing = [];
   if (!n.parentName) missing.push("parentName");
   if (!n.parentPhone || n.parentPhone.replace(/\D/g, "").length < 9) missing.push("parentPhone");
   if (!n.participantFirstName) missing.push("participantFirstName");
   if (!GRADES.some((g) => g.value === n.grade)) missing.push("grade");
+  if (requireGroup && !values.groupId) missing.push("groupId");
   if (values.consent !== true) missing.push("consent");
   return missing;
 }
 
-export function buildLeadPayload(values, { idempotencyKey, visitorId, attribution }) {
+/**
+ * The body the server accepts. `groupId` is the group the parent picked, and `waitlist` is sent
+ * only when they deliberately chose to wait for a place in a full group — never as `false`, which
+ * would be the browser asserting a state it does not own.
+ */
+export function buildLeadPayload(values, { idempotencyKey, visitorId, attribution, groupId, waitlist }) {
   return {
     ...normalizeForm(values),
     consent: true,
     idempotencyKey,
+    ...(groupId ? { groupId } : {}),
+    ...(groupId && waitlist === true ? { waitlist: true } : {}),
     ...(visitorId ? { visitorId } : {}),
     ...referralFields(attribution),
   };
@@ -179,7 +199,9 @@ export function classifyOutcome(status, body) {
   if (status === 201 && body?.ok) return "created";
   if (status === 200 && body?.ok) return "replay";
   if (status === 400) return "invalid";
-  if (status === 409) return "conflict";
+  // Two different 409s: the group filled while the form was open, or the same idempotency key was
+  // reused for a different submission.
+  if (status === 409) return body?.error === "group_full" ? "group_full" : "conflict";
   if (status === 429) return "rate_limited";
   if (status === 503) return "unavailable";
   if (status === 404 || status === 405) return "unavailable";

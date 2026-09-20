@@ -44,6 +44,16 @@ import {
   markUncertain,
   resetKeyState,
 } from "../public/js/acquisition.js";
+import {
+  parseDate,
+  timeOfDay,
+  glyphFor,
+  formatSession,
+  commonHours,
+  layoutMonths,
+  describeAvailability,
+  fetchGroups,
+} from "../public/js/schedule.js";
 import { CONTRACT_VERSION } from "../public/js/contract.js";
 import { FIELDS, STARTER_CONFIG, THEME_CARD_SET, FIREKEEPER_FACES } from "../public/js/schema.js";
 
@@ -528,4 +538,151 @@ test("the page wires the key state, marks timeouts uncertain and explains a rota
   assert.match(script, /decision\.rotatedAfterUncertain/);
   assert.match(script, /resetKeyState\(keys\)/);
   assert.doesNotMatch(script, /keyFor_|\bkey = null\b/);
+});
+
+// ---------------------------------------------------------------------------
+// Groups and their meetings — schedule.js, and the picker on the page
+// ---------------------------------------------------------------------------
+
+const SESSIONS = [
+  { n: 1, date: "2026-10-23", start: "10:00", end: "12:00", note: null },
+  { n: 2, date: "2026-10-30", start: "10:00", end: "12:00", note: "מפגש חלופי בגלל חג" },
+  { n: 3, date: "2026-11-06", start: "10:00", end: "12:00", note: null },
+];
+
+test("schedule.js reads a calendar day without a timezone moving it, and refuses what is not a date", () => {
+  assert.deepEqual(parseDate("2026-10-23"), { year: 2026, month: 10, day: 23, weekday: 5 });
+  assert.equal(parseDate("2026-10-25").weekday, 0, "Sunday");
+  for (const bad of ["2026-02-30", "2026-13-01", "23/10/2026", "", null, undefined, "2026-1-1"]) {
+    assert.equal(parseDate(bad), null, String(bad));
+  }
+});
+
+test("schedule.js derives the time-of-day mark from the hour, and never stores one", () => {
+  assert.equal(timeOfDay("10:00"), "morning");
+  assert.equal(timeOfDay("13:30"), "afternoon");
+  assert.equal(timeOfDay("17:00"), "evening");
+  assert.equal(glyphFor("10:00"), "☀");
+  assert.equal(glyphFor("19:00"), "☾");
+  // The page derives the mark; nothing is ever sent to the server about it.
+  assert.doesNotMatch(read("js/schedule.js"), /timeOfDay:/);
+});
+
+test("schedule.js lays out one grid per month, Sunday first, with Amit's own meeting numbers", () => {
+  const months = layoutMonths(SESSIONS);
+  assert.equal(months.length, 2);
+  assert.deepEqual(months.map((m) => [m.year, m.month]), [[2026, 10], [2026, 11]]);
+  assert.equal(months[0].label, "אוקטובר 2026");
+  // October 2026 starts on a Thursday: four blank squares, then 31 days, padded to whole weeks.
+  assert.equal(months[0].cells.slice(0, 4).every((c) => c === null), true);
+  assert.equal(months[0].cells[4].day, 1);
+  assert.equal(months[0].cells.length % 7, 0);
+  assert.equal(months[0].cells.filter((c) => c !== null).length, 31);
+  const marked = months[0].cells.filter((c) => c !== null && c.n !== null);
+  assert.deepEqual(marked.map((c) => [c.date, c.n]), [["2026-10-23", 1], ["2026-10-30", 2]]);
+  assert.equal(months[1].cells.filter((c) => c !== null && c.n !== null).length, 1);
+  // Nothing to draw is nothing drawn, and a month with no meeting is never drawn.
+  assert.deepEqual(layoutMonths([]), []);
+  assert.deepEqual(layoutMonths([{ n: 1, date: "nonsense", start: "10:00", end: "12:00" }]), []);
+});
+
+test("schedule.js formats a meeting as a weekday, a day and its hours, and keeps a note", () => {
+  const line = formatSession(SESSIONS[1]);
+  assert.equal(line.n, 2);
+  assert.equal(line.weekday, "שישי");
+  assert.equal(line.dayMonth, "30.10");
+  assert.equal(line.time, "10:00–12:00");
+  assert.equal(line.note, "מפגש חלופי בגלל חג");
+  assert.equal(formatSession({ n: 1, date: "bad", start: "x", end: "y" }).time, "");
+  assert.equal(commonHours(SESSIONS), "10:00–12:00");
+  assert.equal(commonHours([SESSIONS[0], { ...SESSIONS[1], start: "17:00", end: "19:00" }]), null);
+});
+
+test("schedule.js says how many places are left, and never a negative number", () => {
+  assert.equal(describeAvailability(3, 2), "2 מתוך 3 מקומות פנויים");
+  assert.equal(describeAvailability(3, 1), "נותר מקום אחד");
+  assert.equal(describeAvailability(3, 0), "הקבוצה מלאה");
+  assert.equal(describeAvailability(3, -5), "הקבוצה מלאה");
+  assert.equal(describeAvailability(3, 99), "3 מתוך 3 מקומות פנויים");
+});
+
+test("fetchGroups never breaks the page: a failure, a refusal and a malformed group all yield an empty list", async () => {
+  const ok = await fetchGroups("http://live.test", {
+    fetchImpl: async () => ({ ok: true, json: async () => ({ groups: [{ id: "a".repeat(24), label: " ימי שישי ", capacity: 3, available: 2, full: false, locationLabel: " יוקנעם ", sessions: SESSIONS }] }) }),
+  });
+  assert.equal(ok.length, 1);
+  assert.equal(ok[0].label, "ימי שישי");
+  assert.equal(ok[0].locationLabel, "יוקנעם");
+  assert.equal(ok[0].available, 2);
+  assert.equal(ok[0].full, false);
+  assert.equal(ok[0].sessions.length, 3);
+
+  const capped = await fetchGroups("http://live.test", {
+    fetchImpl: async () => ({ ok: true, json: async () => ({ groups: [{ id: "a".repeat(24), label: "x", capacity: 3, available: 9, full: false, sessions: SESSIONS }] }) }),
+  });
+  assert.equal(capped[0].available, 3);
+
+  for (const fetchImpl of [
+    async () => { throw new Error("offline"); },
+    async () => ({ ok: false, json: async () => ({}) }),
+    async () => ({ ok: true, json: async () => ({}) }),
+    async () => ({ ok: true, json: async () => ({ groups: [{ id: "x", label: "", sessions: [] }] }) }),
+  ]) {
+    assert.deepEqual(await fetchGroups("http://live.test", { fetchImpl }), []);
+  }
+});
+
+test("the payload carries the chosen group, and the waiting list only when it was chosen deliberately", () => {
+  const base = { idempotencyKey: "k-1234567890", visitorId: "v-1234567890", attribution: null };
+  const withGroup = buildLeadPayload(formValues(), { ...base, groupId: "b".repeat(24) });
+  assert.equal(withGroup.groupId, "b".repeat(24));
+  assert.equal("waitlist" in withGroup, false, "waitlist is never sent as false");
+  const waiting = buildLeadPayload(formValues(), { ...base, groupId: "b".repeat(24), waitlist: true });
+  assert.equal(waiting.waitlist, true);
+  // A waiting list with no group is not something the browser may assert.
+  assert.equal("waitlist" in buildLeadPayload(formValues(), { ...base, waitlist: true }), false);
+  assert.deepEqual(Object.keys(waiting).sort(), ["consent", "grade", "groupId", "idempotencyKey", "parentName", "parentPhone", "participantFirstName", "visitorId", "waitlist"].sort());
+});
+
+test("the form asks for a group only while groups are on offer, and a full group is a 409 of its own", () => {
+  assert.deepEqual(missingFields(formValues()), []);
+  assert.deepEqual(missingFields(formValues(), { requireGroup: true }), ["groupId"]);
+  assert.deepEqual(missingFields({ ...formValues(), groupId: "b".repeat(24) }, { requireGroup: true }), []);
+  assert.equal(describeFields(["groupId"]), "מועד");
+  assert.equal(classifyOutcome(409, { error: "group_full" }), "group_full");
+  assert.equal(classifyOutcome(409, { error: "idempotency_conflict" }), "conflict");
+});
+
+test("landing: the picker is server-fed — no calendar date anywhere in the markup", () => {
+  const markup = withoutCode(landing);
+  assert.doesNotMatch(markup, /20\d\d-\d\d-\d\d/);
+  assert.doesNotMatch(markup, /\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b/);
+  // The picker's containers are empty and hidden until LIVE answers.
+  assert.match(markup, /<div class="picker" id="picker" hidden>/);
+  assert.match(markup, /<div class="groups" id="group-cards" role="group" aria-label="בחרו מועד לסדנה"><\/div>/);
+  assert.match(markup, /<div class="sched" id="group-schedule" hidden><\/div>/);
+  assert.match(markup, /<input type="hidden" name="groupId" id="f-group" value="">/);
+  assert.match(markup, /<span class="eyebrow">בחרו מועד לסדנה<\/span>/);
+  // The waiting-list sentence is honest about what it holds.
+  assert.match(markup, /ההרשמה היא לרשימת ההמתנה\. מקום יישמר רק אם יתפנה, ולאחר תשלום\./);
+  // Amit's own hours line stays as the fallback, and is replaced from the same GET when it answers.
+  assert.match(markup, /id="when-text"><span class="num-ltr">10:00–12:00<\/span>, עשרה מפגשים שבועיים ביוקנעם\./);
+});
+
+test("landing: the picker wiring draws from the API, escapes what it prints, and mentions nothing that does not exist yet", () => {
+  const code = withoutComments(landing.slice(landing.indexOf('<script type="module">')));
+  assert.match(code, /from "\.\/js\/schedule\.js"/);
+  assert.match(code, /groups = await fetchGroups\(API_BASE, options\)/);
+  assert.match(code, /if \(groups\.length === 0\) return;/);
+  assert.match(code, /picker\.hidden = false/);
+  assert.match(code, /requireGroup: groups\.length > 0/);
+  assert.match(code, /waitlist: waitlistMode/);
+  assert.match(code, /case "group_full":/);
+  // Server strings reach the page as text; the one that goes into HTML is escaped.
+  assert.match(code, /escapeText\(selected\.label\)/);
+  assert.doesNotMatch(code, /innerHTML\s*=\s*`?\$\{group/);
+  // Increment 1 carries nothing of a parent portal.
+  for (const absent of ["portalUrl", "acq_portal", "/workshop/order/", "קישור אישי", "ספירה לאחור"]) {
+    assert.equal(landing.includes(absent), false, `the page must not mention ${absent}`);
+  }
 });

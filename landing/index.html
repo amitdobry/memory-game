@@ -199,6 +199,52 @@ details.meeting[open] .mchev{transform:rotate(180deg)}
 .fact h3{margin-bottom:5px;font-size:1.02rem}
 .fact p{margin:0;color:var(--muted);font-size:.93rem}
 
+/* --- group picker: the page's own language, nothing new --- */
+.picker{margin-bottom:clamp(26px,4vw,38px)}
+.picker>.eyebrow{margin-bottom:10px;display:inline-flex}
+/* minmax up to 300px, not 1fr: one open group should read as a card, not as a banner. */
+.groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(224px,300px));gap:14px;margin-top:14px}
+.gcard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;
+  display:grid;gap:10px;text-align:start;font:inherit;color:inherit;cursor:pointer;
+  transition:transform .16s ease,border-color .16s ease,background .16s ease}
+.gcard:hover{transform:translateY(-2px);border-color:rgba(129,140,248,.45);background:var(--card-hi)}
+.gcard[aria-pressed="true"]{border-color:rgba(34,211,238,.5);background:var(--card-hi);
+  box-shadow:0 14px 34px -18px rgba(34,211,238,.65)}
+.gcard .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;
+  background:rgba(129,140,248,.14);border:1px solid rgba(129,140,248,.3);color:var(--violet-soft);
+  font-size:1.05rem;font-weight:900}
+.gcard h3{font-size:1.06rem}
+.gcard .when{color:var(--muted);font-size:.95rem}
+.gcard .seats{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:.9rem}
+.gcard .seats i{display:flex;gap:4px}
+.gcard .seats i b{width:9px;height:14px;border-radius:5px 5px 3px 3px;background:rgba(255,255,255,.14);display:block}
+.gcard .seats i b.free{background:var(--grad)}
+.gcard.is-full{opacity:.82}
+.gcard.is-full .seats{color:#fca5a5}
+.gwrap{display:flex;flex-direction:column}
+.gwrap .gcard{flex:1}
+.wait{margin-top:8px}
+.wait button{background:none;border:1px dashed var(--line);color:var(--muted);border-radius:999px;
+  padding:8px 16px;font:inherit;font-size:.9rem;cursor:pointer}
+.wait button:hover{color:var(--ink);border-color:rgba(34,211,238,.45)}
+.sched{margin-top:22px;display:grid;gap:18px}
+.sched .intro{color:var(--muted);margin:0}
+.months{display:grid;grid-template-columns:repeat(auto-fit,minmax(212px,1fr));gap:14px}
+.month{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 14px 16px}
+.month h4{margin:0 0 10px;font-size:.92rem;font-weight:700;color:var(--cyan-soft)}
+.mgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.mgrid span{font-size:.72rem;color:var(--dim);padding-bottom:2px}
+.mgrid div{padding:5px 0;border-radius:8px;font-size:.82rem;color:var(--dim);direction:ltr;unicode-bidi:isolate}
+.mgrid div.on{background:rgba(34,211,238,.13);border:1px solid rgba(34,211,238,.34);color:var(--ink);font-weight:700}
+.mgrid div.on b{display:block;font-size:.56rem;font-weight:700;color:var(--cyan-soft);direction:rtl;white-space:nowrap}
+.mlist{list-style:none;padding:0;margin:0;display:grid;gap:9px}
+.mlist li{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:10px 14px;color:var(--muted);font-size:.95rem}
+.mlist .when{color:var(--ink);font-weight:700}
+.mlist .snote{color:var(--cyan-soft);font-size:.86rem}
+.sched .foot{color:var(--dim);font-size:.9rem;margin:0}
+[aria-invalid="true"].groups{outline:1px solid rgba(248,113,113,.7);outline-offset:8px;border-radius:14px}
+
 /* --- contact --- */
 .signup{background:linear-gradient(150deg,rgba(34,211,238,.09),rgba(129,140,248,.09));
   border:1px solid rgba(129,140,248,.26);border-radius:24px;padding:clamp(26px,4vw,46px)}
@@ -292,7 +338,7 @@ footer a{color:var(--muted);text-decoration:none}
     <span class="eyebrow">סדנה מעשית לתלמידי כיתות ז׳–ט׳</span>
     <h1><span>רעיון קטן.</span><span class="grad-text">אפליקציה אמיתית.</span></h1>
     <p class="lead">עשרה מפגשים שבהם לומדים לחשוב כמו מפתחים, לעבוד נכון עם AI ולבנות משחקים שאפשר לפתוח ולשחק.</p>
-    <div class="keyline" aria-label="עיקרי הסדנה"><span>10 מפגשים</span><span>3 תלמידים בלבד</span><span>ימי שישי</span></div>
+    <div class="keyline" aria-label="עיקרי הסדנה"><span>10 מפגשים</span><span>3 תלמידים בלבד</span><span id="when-chip">ימי שישי</span></div>
     <div class="btn-row">
       <a class="btn btn-primary" href="#contact">פרטים והרשמה</a>
       <a class="btn btn-ghost" href="#projects">למשחקים שבנינו</a>
@@ -560,7 +606,9 @@ footer a{color:var(--muted);text-decoration:none}
       <h2>קבוצה קטנה. עבודה אמיתית.</h2>
     </div>
     <div class="facts">
-      <div class="fact"><div class="ic">⌁</div><h3>ימי שישי</h3><p><span class="num-ltr">10:00–12:00</span>, עשרה מפגשים שבועיים ביוקנעם.</p></div>
+      <!-- The title and the line below it are replaced by the open group's own hours, meeting
+           count and location when LIVE answers; this wording is the offline fallback. -->
+      <div class="fact"><div class="ic" id="when-glyph">⌁</div><h3 id="when-title">ימי שישי</h3><p id="when-text"><span class="num-ltr">10:00–12:00</span>, עשרה מפגשים שבועיים ביוקנעם.</p></div>
       <div class="fact"><div class="ic">3</div><h3>עד שלושה תלמידים</h3><p>קבוצה שמאפשרת לכל תלמיד לבנות, לשאול ולקבל ליווי.</p></div>
       <div class="fact"><div class="ic">⌨</div><h3>מחשב נייד לכל תלמיד</h3><p>יש להביא מחשב נייד אישי ומטען כבר מהמפגש הראשון.</p></div>
       <div class="fact"><div class="ic">✓</div><h3>תוצר ותעודת סיום</h3><p>כל תלמיד מסיים עם משחק מקורי ויכול להסביר כיצד הוא עובד.</p></div>
@@ -606,7 +654,17 @@ footer a{color:var(--muted);text-decoration:none}
       <h2>רוצים לבדוק אם הסדנה מתאימה?</h2>
       <p class="lead" style="margin-top:14px">השאירו פרטים ואחזור אליכם, או כתבו לי ישירות ב־WhatsApp. נדבר על הילד או הילדה, הניסיון הקודם ומה הם היו רוצים לבנות.</p>
 
+      <!-- The groups and their dates come from LIVE (GET /api/acquisition/groups); this markup
+           holds no date, no hour and no group name. When nothing is open, or the call fails, the
+           section stays hidden and the form works exactly as it did before groups existed. -->
+      <div class="picker" id="picker" hidden>
+        <span class="eyebrow">בחרו מועד לסדנה</span>
+        <div class="groups" id="group-cards" role="group" aria-label="בחרו מועד לסדנה"></div>
+        <div class="sched" id="group-schedule" hidden></div>
+      </div>
+
       <form id="lead-form" novalidate>
+        <input type="hidden" name="groupId" id="f-group" value="">
         <div class="row2">
           <div class="field">
             <label for="f-parent">שם ההורה</label>
@@ -661,6 +719,7 @@ footer a{color:var(--muted);text-decoration:none}
         </label>
 
         <button class="btn btn-primary" id="submit-btn" type="submit" style="width:100%;border:0">שלחו פרטים</button>
+        <p class="form-note" id="wait-note" hidden>ההרשמה היא לרשימת ההמתנה. מקום יישמר רק אם יתפנה, ולאחר תשלום.</p>
         <div class="form-msg" id="form-msg" role="status" aria-live="polite"></div>
       </form>
 
@@ -704,6 +763,15 @@ import {
   markUncertain,
   resetKeyState,
 } from "./js/acquisition.js";
+import {
+  fetchGroups,
+  layoutMonths,
+  formatSession,
+  commonHours,
+  describeAvailability,
+  glyphFor,
+  WEEKDAY_LETTERS,
+} from "./js/schedule.js";
 
 const WHATSAPP_NUMBER = "972546111602";
 
@@ -744,6 +812,184 @@ factsLabel?.addEventListener("click", () => {
 });
 
 /* ------------------------------------------------------------------
+   בחרו מועד לסדנה — the groups and their meetings.
+
+   LIVE owns the schedule; this page asks for it on load and draws it.
+   Nothing here is written into the page source, so a date changes in
+   the Engine Room and not in a deploy. Choosing a group reserves
+   nothing: a place is secured only when the payment is recorded.
+
+   Everything drawn from the server goes in through textContent, so a
+   label is always text and never markup.
+   ------------------------------------------------------------------ */
+const picker = document.getElementById("picker");
+const cardsBox = document.getElementById("group-cards");
+const schedBox = document.getElementById("group-schedule");
+const groupField = document.getElementById("f-group");
+const waitNote = document.getElementById("wait-note");
+
+let groups = [];
+let selected = null;
+let waitlistMode = false;
+
+/* The one place a server-stored string goes into HTML rather than into a text node: the success
+   line. Escaped here, because "the only person who can type a group name is Amit" is a reason to
+   be careful, not a reason to skip it. */
+const escapeText = (value) =>
+  String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const el = (tag, className, text) => {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+};
+
+function seatsRow(group) {
+  const row = el("div", "seats");
+  const dots = el("i");
+  for (let i = 0; i < group.capacity; i += 1) {
+    const dot = el("b");
+    if (i < group.available) dot.className = "free";
+    dots.append(dot);
+  }
+  row.append(dots, el("span", null, describeAvailability(group.capacity, group.available)));
+  return row;
+}
+
+function cardFor(group) {
+  const card = el("button", "gcard" + (group.full ? " is-full" : ""));
+  card.type = "button";
+  card.setAttribute("aria-pressed", "false");
+  const hours = commonHours(group.sessions);
+  card.append(el("div", "ic", glyphFor(group.sessions[0]?.start)), el("h3", null, group.label));
+  const when = el("div", "when");
+  when.append(hours ? el("span", "num-ltr", hours) : document.createTextNode("שעות משתנות"));
+  card.append(when, seatsRow(group));
+  card.addEventListener("click", () => { choose(group, false); });
+
+  if (!group.full) return card;
+
+  // A full group cannot be chosen as an ordinary registration; the waiting list is a separate,
+  // quieter decision, and it is honest about holding nothing.
+  card.disabled = true;
+  const wrap = el("div", "gwrap");
+  wrap.append(card);
+  const wait = el("div", "wait");
+  const button = el("button", null, "הצטרפו לרשימת ההמתנה");
+  button.type = "button";
+  button.addEventListener("click", () => { choose(group, true); });
+  wait.append(button);
+  wrap.append(wait);
+  return wrap;
+}
+
+function monthGrid(month) {
+  const box = el("div", "month");
+  box.append(el("h4", null, month.label));
+  const grid = el("div", "mgrid");
+  for (const letter of WEEKDAY_LETTERS) grid.append(el("span", null, letter));
+  for (const cell of month.cells) {
+    if (cell === null) { grid.append(el("div")); continue; }
+    const day = el("div", cell.n === null ? "" : "on");
+    day.append(document.createTextNode(String(cell.day)));
+    if (cell.n !== null) day.append(el("b", null, `מפגש ${cell.n}`));
+    grid.append(day);
+  }
+  box.append(grid);
+  return box;
+}
+
+function renderSchedule(group) {
+  schedBox.textContent = "";
+  schedBox.append(el("p", "intro", `בחרתם את קבוצת ${group.label}. להלן כל תאריכי המפגשים:`));
+
+  const months = el("div", "months");
+  for (const month of layoutMonths(group.sessions)) months.append(monthGrid(month));
+  schedBox.append(months);
+
+  schedBox.append(el("span", "eyebrow", "רשימת המפגשים"));
+  const list = el("ul", "mlist");
+  for (const session of group.sessions) {
+    const line = formatSession(session);
+    const item = el("li");
+    item.append(el("span", "mnum", String(line.n)));
+    const when = el("span", "when");
+    when.append(document.createTextNode(`יום ${line.weekday}, `));
+    when.append(el("span", "num-ltr", line.dayMonth));
+    when.append(document.createTextNode(" · "));
+    when.append(el("span", "num-ltr", line.time));
+    item.append(when);
+    if (line.note) item.append(el("span", "snote", line.note));
+    list.append(item);
+  }
+  schedBox.append(list);
+
+  // The hours go in a num-ltr span like every other time on this page: left to right, so bidi
+  // cannot swap "10:00–12:00" into "12:00–10:00" inside a right-to-left sentence.
+  const foot = el("p", "foot");
+  foot.append(document.createTextNode(`${group.sessions.length} מפגשים`));
+  const hours = commonHours(group.sessions);
+  if (hours) {
+    foot.append(document.createTextNode(" · "));
+    foot.append(el("span", "num-ltr", hours));
+  }
+  if (group.locationLabel) foot.append(document.createTextNode(` · ${group.locationLabel}`));
+  schedBox.append(foot);
+  schedBox.hidden = false;
+}
+
+function choose(group, waitlist) {
+  selected = group;
+  waitlistMode = waitlist;
+  groupField.value = group.id;
+  waitNote.hidden = !waitlist;
+  for (const card of cardsBox.querySelectorAll(".gcard")) card.setAttribute("aria-pressed", "false");
+  const index = groups.indexOf(group);
+  cardsBox.querySelectorAll(".gcard")[index]?.setAttribute("aria-pressed", "true");
+  cardsBox.removeAttribute("aria-invalid");
+  renderSchedule(group);
+}
+
+/* The hero chip and the facts card say what the open group actually is, rather than what the page
+   was written with. With one group they read exactly as before; the page's own wording stays as
+   the fallback when LIVE is unreachable. */
+function adjustCopy() {
+  const labels = [...new Set(groups.map((g) => g.label))];
+  const chip = document.getElementById("when-chip");
+  if (chip) chip.textContent = labels.join(" · ");
+  if (groups.length !== 1) return;
+  const [group] = groups;
+  const title = document.getElementById("when-title");
+  const text = document.getElementById("when-text");
+  const glyph = document.getElementById("when-glyph");
+  if (title) title.textContent = group.label;
+  if (glyph) glyph.textContent = glyphFor(group.sessions[0]?.start);
+  if (!text) return;
+  text.textContent = "";
+  const hours = commonHours(group.sessions);
+  if (hours) {
+    text.append(el("span", "num-ltr", hours));
+    text.append(document.createTextNode(" · "));
+  }
+  text.append(document.createTextNode(`${group.sessions.length} מפגשים`));
+  if (group.locationLabel) text.append(document.createTextNode(` · ${group.locationLabel}`));
+}
+
+async function loadGroups(options = {}) {
+  groups = await fetchGroups(API_BASE, options);
+  if (groups.length === 0) return;
+  cardsBox.textContent = "";
+  for (const group of groups) cardsBox.append(cardFor(group));
+  picker.hidden = false;
+  adjustCopy();
+  // One open group and a place in it: preselect, so the dates are on screen without a click.
+  if (groups.length === 1 && !groups[0].full) choose(groups[0], false);
+}
+
+void loadGroups();
+
+/* ------------------------------------------------------------------
    The registration form.
 
    Only a confirmed acknowledgement from the server means "registered".
@@ -768,6 +1014,7 @@ function values() {
     participantFirstName: data.get("participantFirstName"),
     grade: data.get("grade"),
     note: data.get("note"),
+    groupId: data.get("groupId"),
     consent: document.getElementById("f-consent").checked,
   };
 }
@@ -792,9 +1039,11 @@ const WA_INSTEAD = (v) => ` <br><a class="btn btn-ghost" href="${waWithDetails(v
 
 function markInvalid(fields) {
   for (const el of form.querySelectorAll("[aria-invalid]")) el.removeAttribute("aria-invalid");
-  const ids = { parentName: "f-parent", parentPhone: "f-phone", parentEmail: "f-email", participantFirstName: "f-student", grade: "f-grade", note: "f-note", consent: "f-consent" };
+  cardsBox.removeAttribute("aria-invalid");
+  const ids = { parentName: "f-parent", parentPhone: "f-phone", parentEmail: "f-email", participantFirstName: "f-student", grade: "f-grade", note: "f-note", consent: "f-consent", groupId: "group-cards" };
   for (const f of fields) document.getElementById(ids[f])?.setAttribute("aria-invalid", "true");
   const first = fields[0] && document.getElementById(ids[fields[0]]);
+  if (first === cardsBox) { first.scrollIntoView({ block: "center", behavior: "smooth" }); first.querySelector("button")?.focus(); return; }
   first?.focus();
 }
 
@@ -803,7 +1052,7 @@ form.addEventListener("submit", async (event) => {
   if (done) return;
   const v = values();
 
-  const missing = missingFields(v);
+  const missing = missingFields(v, { requireGroup: groups.length > 0 });
   if (missing.length) {
     markInvalid(missing);
     show("err", `חסר או לא תקין: ${describeFields(missing)}.`);
@@ -812,7 +1061,7 @@ form.addEventListener("submit", async (event) => {
   markInvalid([]);
 
   const decision = keyForSubmission(keys, v);
-  const payload = buildLeadPayload(v, { idempotencyKey: decision.key, visitorId, attribution });
+  const payload = buildLeadPayload(v, { idempotencyKey: decision.key, visitorId, attribution, groupId: v.groupId, waitlist: waitlistMode });
   busy(true);
   show("info", decision.rotatedAfterUncertain
     ? "שיניתם פרטים אחרי ניסיון שלא אושר. הפרטים החדשים נשלחים כהרשמה חדשה; אם הניסיון הקודם כן נקלט, עמית יראה את שניהם."
@@ -844,7 +1093,7 @@ form.addEventListener("submit", async (event) => {
       for (const el of form.querySelectorAll("input,select,textarea")) el.disabled = true;
       button.hidden = true;
       show("ok",
-        "ההרשמה נקלטה. עמית יחזור אליכם בטלפון או ב-WhatsApp. " +
+        `ההרשמה נקלטה${selected ? (waitlistMode ? ` לרשימת ההמתנה של קבוצת ${escapeText(selected.label)}` : ` לקבוצת ${escapeText(selected.label)}`) : ""}. עמית יחזור אליכם בטלפון או ב-WhatsApp. ` +
         `<br><button type="button" class="btn btn-ghost" id="another">להרשמת משתתף נוסף</button>`);
       document.getElementById("another").addEventListener("click", () => {
         done = false;
@@ -871,6 +1120,23 @@ form.addEventListener("submit", async (event) => {
       document.getElementById("fresh").addEventListener("click", () => {
         resetKeyState(keys);
         form.requestSubmit();
+      });
+      break;
+    case "group_full":
+      // The last place was paid for while this form was open. Nothing was registered; the page
+      // reloads the groups so the card shows the truth, and offers the waiting list instead.
+      show("warn",
+        "המקום האחרון בקבוצה נתפס בזמן מילוי הטופס, וההרשמה לא נשמרה. " +
+        `<br><button type="button" class="btn btn-ghost" id="rejoin">רענון המועדים</button>`);
+      document.getElementById("rejoin").addEventListener("click", () => {
+        selected = null;
+        waitlistMode = false;
+        groupField.value = "";
+        waitNote.hidden = true;
+        schedBox.hidden = true;
+        void loadGroups({ cache: "no-store" });
+        show("", "");
+        msg.className = "form-msg";
       });
       break;
     case "rate_limited":
