@@ -121,13 +121,14 @@ Pages (`/memory-game/`) and, within 15 minutes or on a manual run, the workshop 
 
 ## 3. Proposed architecture (one paragraph)
 
-Two new collections (`acq_groups`, `acq_messages`), three optional fields on existing records
-(`lead.groupId`, `lead.portalTokenHash/IssuedAt`, `enrolment.groupId`), one public GET
+Two new collections (`acq_groups` in increment 1, `acq_messages` in increment 2), optional
+fields on existing records (`lead.groupId` and `enrolment.groupId` in increment 1;
+`lead.portalTokenHash/IssuedAt` in increment 2), one public GET
 (`/api/acquisition/groups`), one optional field on the lead POST (`groupId`), server-rendered
 owner pages for groups under `/engine/acquisition/groups`, and a server-rendered parent portal on
 LIVE at `/workshop/order/<token>` following the distributor-link pattern. The landing page gains
 a picker module that reads the public GET and falls back gracefully. No second workshop system;
-the lead stays the registration; the enrolment stays the seat.
+the lead stays the registration; a **recorded payment** is what secures a seat (§10).
 
 ```
   GitHub Pages (/workshop/)                 LIVE (Heroku)
@@ -162,9 +163,8 @@ interface IAcqGroup {
   _id: ObjectId;
   code: string;            // short stable handle for URLs/forms, e.g. "FRI-AM"; unique; never shown to parents
   label: string;           // "ימי שישי"
-  timeOfDay: 'morning' | 'afternoon' | 'evening';   // drives the card's icon (sun / moon), nothing else
   capacity: number;        // default 3, integer ≥ 1
-  seatsTaken: number;      // confirmed places (enrolments 'enrolled'); maintained transactionally, §10
+  seatsTaken: number;      // SECURED places = enrolments whose full payment Amit has recorded (§10); maintained transactionally
   status: 'draft' | 'open' | 'closed' | 'archived'; // only 'open' is public; 'closed' still shows on portals
   priceAgorot?: number | null;
   locationLabel?: string | null;   // "ביתנו, יוקנעם"
@@ -182,23 +182,36 @@ interface IAcqGroup {
 }
 ```
 
+Deliberately **no** rule about two meetings on one day, a minimum gap or a maximum count: the array
+is whatever Amit types (his requirement is "completely editable"). No `timeOfDay` field either: the
+card's sun/moon glyph is **derived from `start`** in the page module (before 12:00 morning, 12:00–16:59
+afternoon, from 17:00 evening); a cosmetic override can be added later if a real need appears. The
+bones stay boring.
+
 Rules in the schema's pre-validate: `start < end`; sessions sorted by `startsAt`, `n` renumbered
 1..k on save (so removing one renumbers the rest — the portal shows the number, so this matters);
-no two sessions on the same date in one group; `seatsTaken ≤ capacity`; `startsAt/endsAt`
+`seatsTaken ≤ capacity`; `startsAt/endsAt`
 recomputed from `date/start/end` with an explicit **Asia/Jerusalem** conversion (Intl-based
 offset lookup; no library), so DST changes cannot shift a 10:00 meeting.
 
 Indexes (migration): `{code: 1}` unique; `{status: 1, order: 1}`.
 
-### 4.2 The lead gains three optional fields (no data migration)
+### 4.2 The lead gains optional fields (no data migration), one per increment
+
+Increment 1:
 
 ```ts
 groupId?: ObjectId | null;          // the group the parent chose; null for leads before groups existed or when the picker was unavailable
+```
+
+Increment 2 only (nothing about the portal is added to the lead before then):
+
+```ts
 portalTokenHash?: string | null;    // SHA-256 of the parent's link key; null for old leads until Amit issues one
 portalTokenIssuedAt?: Date | null;
 ```
 
-Index (migration): `{portalTokenHash: 1}` unique partial `$type: 'string'`.
+Index (increment 2's migration): `{portalTokenHash: 1}` unique partial `$type: 'string'`.
 
 ### 4.3 The enrolment gains `groupId?: ObjectId | null`
 
@@ -236,8 +249,8 @@ messages are not audited (they are the record); the redaction hook already refus
 
 | Method path | Auth | Purpose |
 |---|---|---|
-| `GET /api/acquisition/groups` | public, CORS (github.io), `cache-control: public, max-age=60` | `{ groups: [{ id, label, timeOfDay, capacity, available, sessions: [{n, date, start, end}], locationLabel, priceAgorot? }] }` for `status: 'open'` only; `available = capacity − seatsTaken` (never below 0). No PII, no codes. 503 while `ACQUISITION_ENABLED` is off (same switch as the intake: the picker is part of registration). |
-| `POST /api/acquisition/lead` | public (existing) | body gains optional `groupId` (24-hex). Validation: exists and `status: 'open'`; a full open group is **still accepted** (the lead is interest, not a seat — §10); a closed/unknown id → 400 `fields: ['groupId']`. Response 201/200 gains `portalUrl` (§8). Replay returns the same portal URL only if the token is still the original (a rotated token is not re-sent). |
+| `GET /api/acquisition/groups` | public, CORS (github.io), `cache-control: public, max-age=60` | `{ groups: [{ id, label, capacity, available, sessions: [{n, date, start, end}], locationLabel, priceAgorot? }] }` for `status: 'open'` only; `available = capacity − seatsTaken`, where a taken seat is a **paid** place (§10), never below 0. No PII, no codes. 503 while `ACQUISITION_ENABLED` is off (same switch as the intake: the picker is part of registration). |
+| `POST /api/acquisition/lead` | public (existing) | body gains optional `groupId` (24-hex). Validation: exists and `status: 'open'`; a closed/unknown id → 400 `fields: ['groupId']`. **A full open group: Amit's decision, pending (§16)** — branch (a) accept and label the lead "waitlist" for Amit; branch (b) refuse with 409 `group_full` and disable the card. Neither is implemented until he decides. Response 201/200 gains `portalUrl` (§8). Replay returns the same portal URL only if the token is still the original (a rotated token is not re-sent). |
 | `GET /workshop/order/<key>` | key in URL | the parent portal page (server-rendered). |
 | `POST /workshop/order/<key>/messages` | key in URL | parent message; form-urlencoded; 303 back. |
 | `GET /engine/acquisition/groups` | Basic | list + "new group" form. |
@@ -257,9 +270,9 @@ Unchanged: `/api/acquisition/visit`, claims, distributor portal, everything else
 
 - **Leads list** (`/engine/acquisition`): a "Group" column (label or `—`), an unread-messages
   badge per lead, and a nav link **Groups**.
-- **Groups list** (`/engine/acquisition/groups`): label, time of day, status, seats
+- **Groups list** (`/engine/acquisition/groups`): label, status, seats
   `taken/capacity`, pending leads, first and last meeting dates, an inline "new group" form
-  (label, time of day, capacity, price, location).
+  (label, capacity, price, location).
 - **Group page** (`/engine/acquisition/groups/<id>`): the fields; a sessions table with one row per
   meeting — number (read-only, renumbered on save), date `<input type=date>`, start and end
   `<input type=time>`, note, a remove checkbox — plus "add a row" (three empty rows are always
@@ -269,8 +282,9 @@ Unchanged: `/api/acquisition/visit`, claims, distributor portal, everything else
   `group.updated` audit row with the before/after session lists.
 - **Lead page**: group (with a select to change it), the seat state (taken / not), the parent
   link block (issue/rotate/revoke, WhatsApp button, shown once), and the **message thread** with a
-  reply box. Setting status `enrolled` **takes a seat** (§10) and refuses with a clear notice when
-  the group is full; leaving `enrolled` releases it.
+  reply box. Setting status `enrolled` does **not** take a seat. **"Mark fully paid" takes the seat** (§10) and
+  refuses with a clear notice (`group_full`) when the group's paid places already equal its capacity;
+  nothing is recorded in that case. A refund releases the seat.
 
 No JavaScript is needed for any of this beyond what the owner pages already have (copy button).
 
@@ -291,9 +305,10 @@ page ends and the picker begins.
 - New module `public/js/schedule.js` (pure, testable): `fetchGroups(apiBase)`, `layoutMonths(
   sessions)` (which months to draw, which days are meetings, RTL week starting Sunday א..ש),
   `formatSession`, `describeAvailability(capacity, available)`. No dates in the page source.
-- New section **"בחרו מועד לסדנה"** above the form: one card per open group — icon by
-  `timeOfDay` (sun / moon as inline SVG), label, `start–end`, three person icons filled by
-  `available` ("2 מתוך 3 מקומות פנויים"; full → "הקבוצה מלאה – אפשר להירשם לרשימת המתנה"),
+- New section **"בחרו מועד לסדנה"** above the form: one card per open group — a sun / moon glyph
+  derived from the start hour, label, `start–end`, three person icons filled by
+  `available` ("2 מתוך 3 מקומות פנויים"; the full-group card's text and behaviour follow Amit's
+  pending decision, §16),
   radio semantics (keyboard accessible, `aria-pressed`). Selecting a card reveals: the info line
   ("בחרתם את קבוצת ימי שישי. להלן כל תאריכי המפגשים:"), three mini month grids with the meeting
   days circled and numbered, the numbered list "רשימת המפגשים", and the footer (hours, location)
@@ -329,9 +344,14 @@ Pages can only serve static files. The URL keeps the prompt's shape.
   2. **המועדים** — the same month grids and numbered list as the picker (a shared render on the
      server this time), with past meetings dimmed, the next one highlighted, future ones plain.
   3. **ההרשמה** — participant first name, grade, parent name and phone (their own), the group,
-     status in plain Hebrew by colour group (בתהליך / נסגר / שולם, with "ממתין לאישור" for
-     `submitted`/`contacted`, "מקום שמור" once enrolled), price if the group has one, paid
-     amount/date if recorded, otherwise "טרם שולם". No payment actions.
+     the group, the price if the group has one, and — the most important line on the page — the
+     **seat state**, driven only by the recorded payment (§10):
+     - unpaid (any status before payment): **"המקום עדיין לא שמור"** — "ההרשמה התקבלה, אך המקום
+       בקבוצה נשמר רק לאחר קבלת התשלום. עד להסדרת התשלום ייתכן שהקבוצה תתמלא." plus the
+       plain status in Hebrew (ממתין לשיחה / בתהליך / נרשמו לסדנה);
+     - paid: **"✓ המקום שלכם שמור"** with the payment date and amount if recorded;
+     - closed statuses: the closed page (§8 states).
+     No payment actions in this increment.
   4. **הודעות** — the thread (parent right, Amit left), a textarea + send; after send a 303 back
      to the page. Amit's replies appear on the next open. Parent messages are rate-limited (10 per
      10 minutes per key, 30 per hour per address) and limited to 1000 characters.
@@ -354,32 +374,47 @@ off the same `leadId` without changing this.
 
 ---
 
-## 10. Capacity semantics
+## 10. Capacity semantics — a place is secured by recorded payment
 
-**A seat is consumed by a confirmed enrolment (`acq_enrolments.status = 'enrolled'` with a
-`groupId`), never by a registration.** Reasons: the lead lifecycle already treats `enrolled` as
-the confirmation Amit gives after a call; three simultaneous parents pressing "register" must all
-get through (they are interest, and Amit chooses); and a lead that goes `not_interested` must not
-have blocked a place for days. So:
+**Business rule (Amit, 20 Sep 2026):** registration does not reserve a place; choosing a group
+does not; receiving the portal link does not; setting a lead to `enrolled` does not. **A place is
+secured only when payment has been received and Amit has recorded it** — the existing durable
+owner action "Mark fully paid", which sets `enrolment.payment.fullyPaidAt`. No second payment
+concept is introduced; capacity attaches to that event.
 
-| Public card shows | Meaning |
+| Term | Definition |
 |---|---|
-| `available = capacity − seatsTaken` | confirmed seats left |
-| "הקבוצה מלאה" when 0 | registration still accepted; the portal says "רשימת המתנה" until Amit moves them or the group changes |
+| **available** (public) | `capacity − seatsTaken`, never below 0 |
+| **registered / pending** (Amit only) | leads with this group in any active status, unpaid — they hold nothing |
+| **enrolled, unpaid** (Amit only) | `enrolled` with an enrolment but no `fullyPaidAt` — still holds nothing; the portal says "המקום עדיין לא שמור" |
+| **secured** | enrolment `status: 'enrolled'` **and** `payment.fullyPaidAt` set — one seat |
+| **released** | a refund (`status: 'refunded'`) gives the seat back; cancelling an unpaid enrolment releases nothing because it held nothing |
 
-Amit's pages additionally show **pending** (leads with this group in `submitted/contacted/
-trial_booked`).
+Example: capacity 3, five parents chose Friday, none has paid → the public card still says
+**3 מקומות פנויים**. The first three payments Amit records secure the three places. Recording a
+fourth fails clearly and records nothing.
 
-**Enforcement**: taking a seat happens inside the existing status-change transaction
-(`changeLeadStatus → enrolled`): `AcqGroup.findOneAndUpdate({_id, seatsTaken: {$lt: capacity}},
-{$inc: {seatsTaken: 1}}, {session})`; a null result means full → outcome `group_full`, nothing
-written, notice on the lead page. Leaving `enrolled` decrements in the same way. A counter instead
-of a count-in-transaction because the conditional update is one atomic operation the database
-guarantees, and it is what makes two simultaneous approvals of the last seat impossible even
-without transactions. A Mongo-lane test reconciles `seatsTaken` with the enrolments count and
-races two approvals for the last seat. Changing `capacity` below `seatsTaken` is refused.
+**Enforcement.** Inside `markEnrolmentPaid`'s existing transaction, before the payment fact is
+written: `AcqGroup.findOneAndUpdate({ _id: groupId, seatsTaken: { $lt: capacity } }, { $inc: { seatsTaken: 1 } }, { session })`.
+A null result means the group is full → outcome `group_full`, the transaction ends with
+**nothing written**: no payment date, no commission, no seat — the enrolled/unpaid state stays
+consistent and Amit sees "the group is full; refund or move this family". The conditional update is
+one atomic operation the database guarantees, so two simultaneous "mark paid" for the last seat
+cannot both succeed even before the transaction commits. A refund (increment 2 or later, when the
+refund action exists) decrements the same way. A lead without a group can be marked paid without
+touching any counter (old leads).
 
----
+**Reconciliation.** A Mongo-lane test asserts `seatsTaken` equals the count of enrolments with
+`groupId`, `status: 'enrolled'` and `fullyPaidAt` set, after a mixed sequence (pay, refuse when
+full, unpaid cancellations). `capacity` cannot be set below `seatsTaken`. Changing a lead's group
+after payment is refused (move = refund + re-register) so a paid seat never floats between groups.
+
+**Unrecorded payments.** If three families pay Amit before he records them, the system does not
+know; whoever is recorded first is secured first. This is accepted for the first run and is the
+reason the portal's unpaid wording says the group may fill.
+
+**Full groups and registration**: whether a group with 3 secured places still accepts new
+registrations (waitlist) is Amit's pending decision (§16).
 
 ## 11. Security model
 
@@ -408,9 +443,10 @@ races two approvals for the last seat. Changing `capacity` below `seatsTaken` is
 - **No data migration.** `groupId`, `portalTokenHash`, `portalTokenIssuedAt` are optional and
   default to null; every reader treats null as "no group / no link yet". Old enrolments keep
   `cohort: 'first-run-2026'` and `groupId: null`, and count toward no group's seats.
-- **Schema migration only** (one file): create `acq_groups` and `acq_messages` with their indexes,
-  add the partial unique index on `acq_leads.portalTokenHash`. The three-collection-count tests
-  are adjusted the way they were on 19 Sep (the data-layer migration owns ten; later ones own theirs).
+- **Schema migrations only, one per increment**: increment 1 creates `acq_groups` and its indexes;
+  increment 2 creates `acq_messages` and adds the partial unique index on `acq_leads.portalTokenHash`.
+  The collection-count tests are adjusted the way they were on 19 Sep (the data-layer migration
+  owns ten; later ones own theirs).
 - **Old landing pages** (`/memory-game/` cached copies, the previous `/workshop/` build) keep
   working: `groupId` is optional on the POST, the response's extra `portalUrl` is ignored by
   old JavaScript.
@@ -422,17 +458,17 @@ races two approvals for the last seat. Changing `capacity` below `seatsTaken` is
 ## 13. Files likely affected
 
 **LIVE**
-- `src/acquisition/constants.ts` (GROUP_STATUSES, TIME_OF_DAY, limits, switch name, rate limits, `ACQ_COLLECTIONS.groups/messages`)
+- `src/acquisition/constants.ts` (GROUP_STATUSES, limits, switch name, rate limits, `ACQ_COLLECTIONS.groups/messages`)
 - `src/models/acqGroup.model.ts`, `src/models/acqMessage.model.ts` (new), `src/models/index.ts`
-- `src/models/acqLead.model.ts` (+3 fields), `src/models/acqEnrolment.model.ts` (+groupId)
+- `src/models/acqLead.model.ts` (+`groupId` in increment 1; +portal token fields in increment 2), `src/models/acqEnrolment.model.ts` (+groupId)
 - `src/acquisition/groups.ts` (new: schedule maths, tz conversion, next-meeting, public shape, seat take/release)
 - `src/acquisition/leads.ts` (groupId validation, portal token issue in the transaction, `portalUrl` in the outcome)
-- `src/acquisition/leadStatus.ts` (seat take/release inside the status transaction; `group_full`)
+- `src/acquisition/leadStatus.ts` (the seat is taken inside `markEnrolmentPaid`'s transaction; `group_full`; group change refused after payment)
 - `src/acquisition/portal.ts` (new: token issue/rotate/revoke, portal view loader, messages)
 - `src/web/acquisitionRoutes.ts` (GET groups; lead POST field), `src/web/parentPortalRoutes.ts` (new)
 - `src/web/groupsOwnerView.ts` (new), `src/web/acquisitionOwnerView.ts` / `acquisitionOwnerData.ts` (group column, thread, link block, unread badge), `src/web/server.ts` (routes, ownerAction cases), `src/web/formBody.ts` (`readFormAll`)
 - `src/config/env.ts` (switch), `src/acquisition/config.ts`
-- `migrations/2026MMDDhhmmss-acquisition-groups-portal-messages.ts`
+- `migrations/2026MMDDhhmmss-acquisition-groups.ts` (increment 1), `migrations/2026MMDDhhmmss-acquisition-parent-portal.ts` (increment 2)
 - tests: `tests/acquisitionGroups.test.ts`, `tests/acquisitionPortal*.test.ts` additions, `tests/integration/acquisitionGroups.test.ts`, `tests/integration/acquisitionParentPortal.test.ts`, count-test adjustments
 
 **memory-game**
@@ -445,8 +481,8 @@ races two approvals for the last seat. Changing `capacity` below `seatsTaken` is
 
 ## 14. Testing strategy
 
-- **Offline (LIVE)**: group schema rules (sort, renumber, start<end, same-day refusal, capacity ≥
-  seats); tz conversion around the DST change (Israel leaves DST on 25 Oct 2026 — a Friday 10:00
+- **Offline (LIVE)**: group schema rules (sort, renumber, start<end, capacity ≥
+  seats; two meetings on one day are accepted); tz conversion around the DST change (Israel leaves DST on 25 Oct 2026 — a Friday 10:00
   before and after must both be 10:00 local); next-meeting derivation (before first, between,
   during a meeting, after last); public shape has no PII; capacity maths; portal render (states,
   escaping, past/next/future classes); message render escaping; owner pages render; migration
@@ -455,8 +491,9 @@ races two approvals for the last seat. Changing `capacity` below `seatsTaken` is
   change with no deploy; lead with `groupId` stored and shown; lead with unknown/closed group →
   400; portal opens with its key, 404 with another lead's key mutated, isolation between two
   leads; rotate/revoke; parent message → appears on the lead page → owner reply → appears on the
-  portal; seat race: two concurrent `enrolled` on the last seat, exactly one succeeds and
-  `seatsTaken` reconciles; leaving enrolled releases; capacity below seats refused; switch off →
+  portal; seat race: two concurrent "mark fully paid" on the last seat, exactly one succeeds, the other
+  records nothing (no payment date, no commission) and `seatsTaken` reconciles; unpaid `enrolled`
+  leads hold no seat; five unpaid registrations leave 3 available; capacity below seats refused; switch off →
   503; every owner write 401 without the credential; old lead without group renders the "date
   to be agreed" portal.
 - **memory-game static**: payload keys; `schedule.js` layout (RTL Sunday-first, month spans, day
@@ -498,8 +535,9 @@ races two approvals for the last seat. Changing `capacity` below `seatsTaken` is
   which hides it from the picker but not from portals).
 - **A parent loses the link**: Amit re-issues from the lead page and sends it by WhatsApp; the
   landing page also keeps it in the browser that registered.
-- **Waitlist**: a full open group still accepts registrations (interest). If Amit prefers to
-  hide or refuse a full group, it is a one-line change in the public shape / validation.
+- **Decision pending — full groups**: (a) accept registrations as a waitlist Amit sees, or (b)
+  refuse them and disable the card. Both are small; the plan implements neither until Amit
+  chooses. Until then a full group only shows "0 מקומות פנויים".
 - **Price**: optional on the group; the portal shows "טרם שולם" until the enrolment is marked
   paid. No payment provider.
 - **Message abuse**: rate limits and a length cap; Amit can revoke the link.
@@ -509,7 +547,7 @@ Assumptions in the prompt that the code says are unnecessary or wrong (Q26): a n
 object (the lead already is it); `/workshop/order/<token>` on the Pages site (must be LIVE);
 "confirmed/pending/released" as new states (they are `enrolled` / the active statuses / leaving
 `enrolled`); polling for messages (refresh-on-load suffices); a migration for old records (none);
-"registration consumes capacity" (it should not; confirmation does).
+"registration consumes capacity" (it should not; recorded payment does — Amit's rule, §10).
 
 ---
 
@@ -532,8 +570,9 @@ Why the split reduces real risk rather than adding ceremony: the two halves fail
 (schedule correctness and deploy ordering versus data exposure and token handling), each is
 rollback-safe on its own, and one PR would span two repositories, two migrations, three new
 collections/fields, four new pages and roughly 2,500 lines — beyond what one review can hold in
-mind. If Amit still prefers one PR, it remains feasible: the plan is written so both increments
-share one migration file and one release checklist; the only cost is review size.
+mind. Amit's ruling (20 Sep 2026): **plan both together, implement sequentially, verify after each.**
+The split is kept genuinely clean — increment 1 adds nothing for the portal (no token fields, no
+messages collection, no `portalUrl`), and increment 2 has its own migration and its own switch.
 
 ---
 
@@ -542,8 +581,7 @@ share one migration file and one release checklist; the only cost is review size
 **Increment 1**
 1. Constants, env switch names, limits; `acqGroup.model.ts` with the schedule rules and tz
    derivation; `groups.ts` (public shape, next-meeting, seat take/release); offline tests incl. DST.
-2. Lead/enrolment optional `groupId`; `leads.ts` validation; `leadStatus.ts` seat logic and
-   `group_full`; migration (groups collection + indexes); count-test adjustments.
+2. Lead/enrolment optional `groupId`; `leads.ts` validation; `leadStatus.ts`: the seat is taken inside `markEnrolmentPaid`, `group_full` refuses a fourth payment and writes nothing; migration (groups collection + indexes); count-test adjustments.
 3. `GET /api/acquisition/groups`; owner groups pages and actions; leads list/detail additions.
 4. Mongo-lane tests (CRUD → public GET, seat race, reconciliation, 401s).
 5. memory-game: `schedule.js` + tests; picker section; payload `groupId`; copy from the GET;
@@ -553,7 +591,7 @@ share one migration file and one release checklist; the only cost is review size
 
 **Increment 2**
 7. Lead `portalTokenHash/IssuedAt`; `portal.ts` (issue/rotate/revoke, view loader, messages);
-   `acqMessage.model.ts`; migration; offline tests.
+   `acqMessage.model.ts`; increment 2's migration (messages collection, portal-token index); offline tests.
 8. `parentPortalRoutes.ts` (page + message POST, limits, switch); owner lead page: link block,
    thread, reply; leads list unread badge; `portalUrl` in the 201.
 9. Mongo-lane tests (isolation, rotate/revoke, thread both ways, closed states, 503, 401s).
@@ -569,18 +607,19 @@ share one migration file and one release checklist; the only cost is review size
 - Amit creates a group with any set of meetings (irregular dates, different hours, a gap), saves,
   and the public page shows the cards and the exact meetings within a minute, with no deploy.
 - Every meeting is individually editable; renumbering follows date order; refusals are explained
-  (end before start, two meetings on one day, capacity below seats).
-- A parent picks a group; the registration stores it; Amit sees the group on the lead and on the
+  (end before start, capacity below seats).
+- A parent picks a group; the registration stores it and reserves nothing; Amit sees the group on the lead and on the
   group's page; attribution is unchanged (verified with a LEAF referral in the Mongo lane and one
   production smoke test cleaned up by id).
-- Two simultaneous confirmations of the last seat: exactly one succeeds; the card shows 0 left;
-  registration still possible and labelled as waitlist on Amit's side.
+- Five unpaid registrations for a group of 3 leave 3 places available in public. Two simultaneous
+  "mark fully paid" for the last place: exactly one succeeds, the other records nothing; the card shows 0 left;
+  the full-group behaviour matches Amit's decision (§16).
 - Old leads and enrolments render unchanged; no data migration ran.
 - All CI jobs green; static checks green; release recorded in the checklist.
 
 **Increment 2**
 - A registration returns a link; the link shows next meeting with countdown, the schedule with
-  past/next/future, the summary and the thread; another lead's link never shows this lead.
+  past/next/future, the summary with the seat state ("המקום עדיין לא שמור" until Amit records payment, then "✓ המקום שלכם שמור") and the thread; another lead's link never shows this lead.
 - A meeting edited in admin is reflected on the parent's next open.
 - Parent writes, Amit sees and replies on the lead page, parent sees the reply on reload;
   parent messages are escaped and length-capped.
