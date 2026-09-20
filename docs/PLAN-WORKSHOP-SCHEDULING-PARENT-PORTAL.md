@@ -154,7 +154,7 @@ the lead stays the registration; a **recorded payment** is what secures a seat (
 Why one document per group and not one config document for everything: groups are edited and
 counted independently (seats), and the public endpoint filters by status. Why embedded meetings
 and not a `sessions` collection: a group's meetings are always read and written together (the
-admin form saves the whole list; the picker and the portal render the whole list), there are at
+admin form saves the whole list; the picker and the portal render the whole list, in Amit's numbering), there are at
 most a few dozen, and nothing ever queries a meeting without its group. The portal's "next
 meeting" is a derivation over the array, not a stored fact.
 
@@ -166,11 +166,13 @@ interface IAcqGroup {
   capacity: number;        // default 3, integer ≥ 1
   seatsTaken: number;      // SECURED places = enrolments whose full payment Amit has recorded (§10); maintained transactionally
   status: 'draft' | 'open' | 'closed' | 'archived'; // only 'open' is public; 'closed' still shows on portals
-  priceAgorot?: number | null;
+  priceAgorot?: number | null;         // list price; first run: 400000 (4,000 ₪)
+  discountPercent?: number | null;     // launch discount; first run: 10 → the portal shows מחיר הרצה 3,600 ₪
+  paymentTermsText?: string | null;    // Hebrew, editable by Amit; first run: two equal cheques of 1,800 ₪ or one bank transfer of the full amount
   locationLabel?: string | null;   // "ביתנו, יוקנעם"
   order: number;           // card order on the page
   sessions: Array<{
-    n: number;             // 1-based, the number printed on the calendar
+    n: number;             // Amit's number for the meeting, printed on the calendar; explicit, unique in the group, stable across date edits
     date: string;          // 'YYYY-MM-DD', Asia/Jerusalem calendar day
     start: string;         // 'HH:MM'
     end: string;           // 'HH:MM'
@@ -188,8 +190,10 @@ card's sun/moon glyph is **derived from `start`** in the page module (before 12:
 afternoon, from 17:00 evening); a cosmetic override can be added later if a real need appears. The
 bones stay boring.
 
-Rules in the schema's pre-validate: `start < end`; sessions sorted by `startsAt`, `n` renumbered
-1..k on save (so removing one renumbers the rest — the portal shows the number, so this matters);
+Rules in the schema's pre-validate: `start < end`; `n` is **explicit and stable** — Amit types it, it must be a
+positive integer unique within the group, and it never changes because a date moved (his rule,
+20 Sep 2026: moving meeting 5 to another day must not re-identify meetings 6 and 7); the array is
+stored in `n` order; "next meeting" is found by `startsAt`, never by `n`;
 `seatsTaken ≤ capacity`; `startsAt/endsAt`
 recomputed from `date/start/end` with an explicit **Asia/Jerusalem** conversion (Intl-based
 offset lookup; no library), so DST changes cannot shift a 10:00 meeting.
@@ -202,6 +206,7 @@ Increment 1:
 
 ```ts
 groupId?: ObjectId | null;          // the group the parent chose; null for leads before groups existed or when the picker was unavailable
+waitlisted?: boolean;               // true when the registration was made for a full group (default false)
 ```
 
 Increment 2 only (nothing about the portal is added to the lead before then):
@@ -250,7 +255,7 @@ messages are not audited (they are the record); the redaction hook already refus
 | Method path | Auth | Purpose |
 |---|---|---|
 | `GET /api/acquisition/groups` | public, CORS (github.io), `cache-control: public, max-age=60` | `{ groups: [{ id, label, capacity, available, sessions: [{n, date, start, end}], locationLabel, priceAgorot? }] }` for `status: 'open'` only; `available = capacity − seatsTaken`, where a taken seat is a **paid** place (§10), never below 0. No PII, no codes. 503 while `ACQUISITION_ENABLED` is off (same switch as the intake: the picker is part of registration). |
-| `POST /api/acquisition/lead` | public (existing) | body gains optional `groupId` (24-hex). Validation: exists and `status: 'open'`; a closed/unknown id → 400 `fields: ['groupId']`. **A full open group: Amit's decision, pending (§16)** — branch (a) accept and label the lead "waitlist" for Amit; branch (b) refuse with 409 `group_full` and disable the card. Neither is implemented until he decides. Response 201/200 gains `portalUrl` (§8). Replay returns the same portal URL only if the token is still the original (a rotated token is not re-sent). |
+| `POST /api/acquisition/lead` | public (existing) | body gains optional `groupId` (24-hex). Validation: exists and `status: 'open'`; a closed/unknown id → 400 `fields: ['groupId']`. **Full group (0 secured places left) — decided (Amit, 20 Sep 2026):** an ordinary registration for it is refused with 409 `group_full` (the card is disabled, so this only happens in a race); a registration that carries `waitlist: true` is accepted and stored with `lead.waitlisted = true`. The body gains that optional boolean. Response 201/200 gains `portalUrl` (§8). Replay returns the same portal URL only if the token is still the original (a rotated token is not re-sent). |
 | `GET /workshop/order/<key>` | key in URL | the parent portal page (server-rendered). |
 | `POST /workshop/order/<key>/messages` | key in URL | parent message; form-urlencoded; 303 back. |
 | `GET /engine/acquisition/groups` | Basic | list + "new group" form. |
@@ -272,13 +277,14 @@ Unchanged: `/api/acquisition/visit`, claims, distributor portal, everything else
   badge per lead, and a nav link **Groups**.
 - **Groups list** (`/engine/acquisition/groups`): label, status, seats
   `taken/capacity`, pending leads, first and last meeting dates, an inline "new group" form
-  (label, capacity, price, location).
+  (label, capacity, price, discount, payment terms, location).
 - **Group page** (`/engine/acquisition/groups/<id>`): the fields; a sessions table with one row per
-  meeting — number (read-only, renumbered on save), date `<input type=date>`, start and end
+  meeting — number `<input type=number>` (editable; must be unique in the group), date `<input type=date>`, start and end
   `<input type=time>`, note, a remove checkbox — plus "add a row" (three empty rows are always
   present at the bottom; empty rows are ignored); one **Save** for the whole group; status buttons
   Open / Close / Archive; a table of leads that chose this group with status colour and links; the
-  confirmed enrolments count. Saving re-derives `startsAt/endsAt`, sorts, renumbers, and writes one
+  confirmed enrolments count. Saving re-derives `startsAt/endsAt`, keeps the numbers exactly as typed (refusing duplicates and
+  non-positive values), and writes one
   `group.updated` audit row with the before/after session lists.
 - **Lead page**: group (with a select to change it), the seat state (taken / not), the parent
   link block (issue/rotate/revoke, WhatsApp button, shown once), and the **message thread** with a
@@ -307,8 +313,11 @@ page ends and the picker begins.
   `formatSession`, `describeAvailability(capacity, available)`. No dates in the page source.
 - New section **"בחרו מועד לסדנה"** above the form: one card per open group — a sun / moon glyph
   derived from the start hour, label, `start–end`, three person icons filled by
-  `available` ("2 מתוך 3 מקומות פנויים"; the full-group card's text and behaviour follow Amit's
-  pending decision, §16),
+  `available` ("2 מתוך 3 מקומות פנויים"). **A full group** (Amit's decision, 20 Sep 2026) shows
+  "הקבוצה מלאה" and cannot be selected as a regular registration; beneath it a quieter button
+  "הצטרפו לרשימת ההמתנה" selects the group in waitlist mode — the schedule is still shown, the form
+  submits `waitlist: true`, and a line under the form says "ההרשמה היא לרשימת ההמתנה. מקום יישמר רק
+  אם יתפנה, ולאחר תשלום." Amit can always raise capacity or open another group.
   radio semantics (keyboard accessible, `aria-pressed`). Selecting a card reveals: the info line
   ("בחרתם את קבוצת ימי שישי. להלן כל תאריכי המפגשים:"), three mini month grids with the meeting
   days circled and numbered, the numbered list "רשימת המפגשים", and the footer (hours, location)
@@ -343,15 +352,19 @@ Pages can only serve static files. The URL keeps the prompt's shape.
      while the tab is open. No polling: a reload re-derives everything.
   2. **המועדים** — the same month grids and numbered list as the picker (a shared render on the
      server this time), with past meetings dimmed, the next one highlighted, future ones plain.
-  3. **ההרשמה** — participant first name, grade, parent name and phone (their own), the group,
-     the group, the price if the group has one, and — the most important line on the page — the
-     **seat state**, driven only by the recorded payment (§10):
+  3. **ההרשמה** — participant first name, grade, the group and its dates, the price line
+     ("מחיר הסדנה 4,000 ₪ · מחיר הרצה 10% הנחה: 3,600 ₪ · תשלום: שני צ׳קים של 1,800 ₪ או העברה
+     בנקאית אחת של מלוא הסכום", from the group's fields), and — the most important line on the
+     page — the **seat state**, driven only by the recorded payment (§10):
      - unpaid (any status before payment): **"המקום עדיין לא שמור"** — "ההרשמה התקבלה, אך המקום
        בקבוצה נשמר רק לאחר קבלת התשלום. עד להסדרת התשלום ייתכן שהקבוצה תתמלא." plus the
        plain status in Hebrew (ממתין לשיחה / בתהליך / נרשמו לסדנה);
      - paid: **"✓ המקום שלכם שמור"** with the payment date and amount if recorded;
+     - waitlisted: **"אתם ברשימת ההמתנה"** — the group is full; the dates are shown; a place opens only
+       if one is released, and is secured only after payment;
      - closed statuses: the closed page (§8 states).
-     No payment actions in this increment.
+     **Nothing else** (Amit's decision): no parent name, phone or email on the page. No payment
+     actions in this increment.
   4. **הודעות** — the thread (parent right, Amit left), a textarea + send; after send a 303 back
      to the page. Amit's replies appear on the next open. Parent messages are rate-limited (10 per
      10 minutes per key, 30 per hour per address) and limited to 1000 characters.
@@ -386,6 +399,7 @@ concept is introduced; capacity attaches to that event.
 |---|---|
 | **available** (public) | `capacity − seatsTaken`, never below 0 |
 | **registered / pending** (Amit only) | leads with this group in any active status, unpaid — they hold nothing |
+| **waitlisted** (Amit only, and on the family's portal) | `lead.waitlisted: true`, registered while the group was full — holds nothing; cannot be marked paid until a seat is free |
 | **enrolled, unpaid** (Amit only) | `enrolled` with an enrolment but no `fullyPaidAt` — still holds nothing; the portal says "המקום עדיין לא שמור" |
 | **secured** | enrolment `status: 'enrolled'` **and** `payment.fullyPaidAt` set — one seat |
 | **released** | a refund (`status: 'refunded'`) gives the seat back; cancelling an unpaid enrolment releases nothing because it held nothing |
@@ -413,8 +427,9 @@ after payment is refused (move = refund + re-register) so a paid seat never floa
 know; whoever is recorded first is secured first. This is accepted for the first run and is the
 reason the portal's unpaid wording says the group may fill.
 
-**Full groups and registration**: whether a group with 3 secured places still accepts new
-registrations (waitlist) is Amit's pending decision (§16).
+**Full groups and registration** (decided): the card is disabled; a waitlist registration is
+accepted with `waitlisted: true` and holds nothing. Amit sees waitlisted families on the group's page
+in registration order.
 
 ## 11. Security model
 
@@ -481,7 +496,7 @@ registrations (waitlist) is Amit's pending decision (§16).
 
 ## 14. Testing strategy
 
-- **Offline (LIVE)**: group schema rules (sort, renumber, start<end, capacity ≥
+- **Offline (LIVE)**: group schema rules (explicit stable numbers, unique per group, start<end, capacity ≥
   seats; two meetings on one day are accepted); tz conversion around the DST change (Israel leaves DST on 25 Oct 2026 — a Friday 10:00
   before and after must both be 10:00 local); next-meeting derivation (before first, between,
   during a meeting, after last); public shape has no PII; capacity maths; portal render (states,
@@ -535,11 +550,15 @@ registrations (waitlist) is Amit's pending decision (§16).
   which hides it from the picker but not from portals).
 - **A parent loses the link**: Amit re-issues from the lead page and sends it by WhatsApp; the
   landing page also keeps it in the browser that registered.
-- **Decision pending — full groups**: (a) accept registrations as a waitlist Amit sees, or (b)
-  refuse them and disable the card. Both are small; the plan implements neither until Amit
-  chooses. Until then a full group only shows "0 מקומות פנויים".
-- **Price**: optional on the group; the portal shows "טרם שולם" until the enrolment is marked
-  paid. No payment provider.
+- **Full groups — decided**: refuse and disable, plus a waitlist. A waitlisted family registers,
+  gets the portal and the dates, and cannot be marked paid while the group is full (`group_full`).
+  When a seat is released or capacity is raised, Amit contacts the first waitlisted family; their
+  payment, once recorded, secures the seat. No automatic promotion.
+- **Price — decided**: list price 4,000 ₪, launch discount 10% → **מחיר הרצה 3,600 ₪**; payment by two
+  equal cheques of 1,800 ₪ or one bank transfer of the full amount. Stored on the group so Amit can
+  change it without a deploy. A partial payment (one cheque) does **not** secure the seat: Amit
+  records "fully paid" when the full sum — or both cheques — is in hand. No payment provider; no
+  deposit concept in this increment.
 - **Message abuse**: rate limits and a length cap; Amit can revoke the link.
 - **Two repos, one feature**: the page must not go out before LIVE (§15).
 
@@ -606,14 +625,15 @@ messages collection, no `portalUrl`), and increment 2 has its own migration and 
 **Increment 1**
 - Amit creates a group with any set of meetings (irregular dates, different hours, a gap), saves,
   and the public page shows the cards and the exact meetings within a minute, with no deploy.
-- Every meeting is individually editable; renumbering follows date order; refusals are explained
-  (end before start, capacity below seats).
+- Every meeting is individually editable; its number is explicit and stays put when its date moves;
+  refusals are explained (end before start, duplicate meeting number, capacity below seats).
 - A parent picks a group; the registration stores it and reserves nothing; Amit sees the group on the lead and on the
   group's page; attribution is unchanged (verified with a LEAF referral in the Mongo lane and one
   production smoke test cleaned up by id).
 - Five unpaid registrations for a group of 3 leave 3 places available in public. Two simultaneous
   "mark fully paid" for the last place: exactly one succeeds, the other records nothing; the card shows 0 left;
-  the full-group behaviour matches Amit's decision (§16).
+  a full group's card is disabled and offers the waitlist; a waitlist registration is stored with
+  `waitlisted: true`, shown as such to Amit, and cannot be marked paid while the group is full.
 - Old leads and enrolments render unchanged; no data migration ran.
 - All CI jobs green; static checks green; release recorded in the checklist.
 
