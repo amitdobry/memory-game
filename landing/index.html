@@ -174,7 +174,8 @@ details.meeting[open] .mchev{transform:rotate(180deg)}
 @media (max-width:860px){.two-col{grid-template-columns:1fr}}
 
 /* --- games --- */
-.games{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.games{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media (max-width:980px){.games{grid-template-columns:1fr 1fr}}
 @media (max-width:760px){.games{grid-template-columns:1fr}}
 .game{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
   padding:26px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:12px;
@@ -588,6 +589,16 @@ footer a{color:var(--muted);text-decoration:none}
         <p>השלד המשותף למפגשים <span class="num-ltr">2–5</span>. ממנו הקבוצה תמציא עולם, חוקים, אירועים ומערכת ששומרת את המשחק.</p>
         <span class="go">פתחו את הדוגמה ↗</span>
       </a>
+      <!-- Rhythm Runner: a finished game built with AI, hosted on Vercel. The module script
+           below rewrites this link with the leaflet marker (?ref=CODE or ?b=N) so the game
+           can hand the visitor back to #contact with the same credit. -->
+      <a class="game" id="game-rhythm" href="https://rhythm-runner-eight.vercel.app/" target="_blank" rel="noopener">
+        <div class="art">◀ ▶ ◀ ▶</div>
+        <span class="tag">דוגמה 03</span>
+        <h3>Rhythm Runner</h3>
+        <p>משחק ריצה בקצב שנבנה כולו עם AI. שמאל, ימין, עלייה, מים. פותחים בטלפון, רצים דקה אחת ורואים מה אפשר לבנות.</p>
+        <span class="go">שחקו עכשיו ↗</span>
+      </a>
     </div>
 
     <div class="card" style="margin-top:20px">
@@ -795,6 +806,20 @@ void sendVisit(API_BASE, visitorId, attribution);
    ------------------------------------------------------------------ */
 const waCard = document.getElementById("wa-link");
 waCard.href = whatsappLink(WHATSAPP_NUMBER, attribution);
+
+/* ------------------------------------------------------------------
+   The Rhythm Runner demo carries the leaflet marker onward (?ref=CODE or
+   ?b=N) and links back to this page's form with the same marker, so a lead
+   that comes through the game is still credited to the leaflet.
+   ------------------------------------------------------------------ */
+const rhythmCard = document.getElementById("game-rhythm");
+if (rhythmCard && attribution) {
+  const marker =
+    attribution.kind === "ref"
+      ? `?ref=${encodeURIComponent(attribution.code)}`
+      : `?b=${encodeURIComponent(attribution.number)}`;
+  rhythmCard.href = `https://rhythm-runner-eight.vercel.app/${marker}`;
+}
 
 /* Five taps on the small "פרטים חשובים" label within two seconds open the distributor claim
    form on LIVE, carrying the leaflet code this page remembers. A person handed a stack of

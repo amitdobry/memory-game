@@ -80,6 +80,12 @@ const withoutComments = (text) =>
 // index.html — the landing page
 // ---------------------------------------------------------------------------
 
+test("the landing page offers Rhythm Runner as the third demo and passes the leaflet marker on", () => {
+  assert.match(landing, /id="game-rhythm"[^>]*href="https:\/\/rhythm-runner-eight\.vercel\.app\/"/);
+  assert.match(landing, /דוגמה 03/);
+  assert.match(landing, /rhythmCard\.href = `https:\/\/rhythm-runner-eight\.vercel\.app\/\$\{marker\}`/);
+});
+
 test("index.html is the landing page, in Hebrew, RTL", () => {
   assert.match(landing, /<html lang="he" dir="rtl">/);
   assert.match(landing, /<title>בונים עם AI/);
