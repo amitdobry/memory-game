@@ -43,6 +43,7 @@ import {
   keyForSubmission,
   markUncertain,
   resetKeyState,
+  changedOffer,
 } from "../public/js/acquisition.js";
 import {
   parseDate,
@@ -52,6 +53,8 @@ import {
   commonHours,
   layoutMonths,
   describeAvailability,
+  describeGroupSize,
+  describePrice,
   fetchGroups,
 } from "../public/js/schedule.js";
 import { CONTRACT_VERSION } from "../public/js/contract.js";
@@ -669,8 +672,9 @@ test("landing: the picker is server-fed — no calendar date anywhere in the mar
   assert.match(markup, /<div class="sched" id="group-schedule" hidden><\/div>/);
   assert.match(markup, /<input type="hidden" name="groupId" id="f-group" value="">/);
   assert.match(markup, /<span class="eyebrow">בחרו מועד לסדנה<\/span>/);
-  // The waiting-list sentence is honest about what it holds.
-  assert.match(markup, /ההרשמה היא לרשימת ההמתנה\. מקום יישמר רק אם יתפנה, ולאחר תשלום\./);
+  // The waiting-list sentence is honest about what it holds (Plan B: no payment condition).
+  assert.match(markup, /ההרשמה היא לרשימת ההמתנה\. אם יתפנה מקום, עמית יחזור אליכם\./);
+  assert.doesNotMatch(markup, /ולאחר תשלום/);
   // Amit's own hours line stays as the fallback, and is replaced from the same GET when it answers.
   assert.match(markup, /id="when-text"><span class="num-ltr">10:00–12:00<\/span>, עשרה מפגשים שבועיים ביוקנעם\./);
 });
@@ -691,4 +695,124 @@ test("landing: the picker wiring draws from the API, escapes what it prints, and
   for (const absent of ["portalUrl", "acq_portal", "/workshop/order/", "קישור אישי", "ספירה לאחור"]) {
     assert.equal(landing.includes(absent), false, `the page must not mention ${absent}`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Plan B (Oct 2026): group size, price, provisional dates, the price the parent saw
+// ---------------------------------------------------------------------------
+
+test("plan B: the group size reads as a range, one number, or nothing at all", () => {
+  assert.equal(describeGroupSize(3, 4), "3–4");
+  assert.equal(describeGroupSize(3, 3), "3");
+  assert.equal(describeGroupSize(null, 4), null);
+  assert.equal(describeGroupSize(undefined, undefined), null);
+  assert.equal(describeGroupSize(5, 4), null);
+});
+
+test("plan B: the price is two equal cheques, written with a thousands comma, or nothing", () => {
+  assert.deepEqual(describePrice(260000, 130000), { price: "2,600", cheque: "1,300" });
+  assert.equal(describePrice(260000, 120000), null, "cheques that do not add up are not a price");
+  assert.equal(describePrice(null, null), null);
+});
+
+test("plan B: availability reads the same for a four-seat group", () => {
+  assert.equal(describeAvailability(4, 4), "4 מתוך 4 מקומות פנויים");
+  assert.equal(describeAvailability(4, 2), "2 מתוך 4 מקומות פנויים");
+  assert.equal(describeAvailability(4, 1), "נותר מקום אחד");
+  assert.equal(describeAvailability(4, 0), "הקבוצה מלאה");
+});
+
+test("plan B: fetchGroups passes provisional, the thresholds, the price and the offer version through — and degrades when they are absent", async () => {
+  const sessions = [{ n: 1, date: "2026-11-06", start: "10:00", end: "12:00", note: null }];
+  const body = {
+    groups: [
+      { id: "a".repeat(24), label: "ימי שישי", capacity: 4, available: 2, full: false, locationLabel: null, minRegistrations: 3, reserved: 2, provisional: true, enrolmentOpen: true, priceAgorot: 260000, chequeCount: 2, chequeAmountAgorot: 130000, offerVersion: "0123456789abcdef", sessions },
+      { id: "b".repeat(24), label: "ישנה", capacity: 3, available: 3, full: false, locationLabel: null, sessions },
+    ],
+  };
+  const groups = await fetchGroups("https://example.test", { fetchImpl: async () => ({ ok: true, json: async () => body }) });
+  assert.deepEqual(
+    { provisional: groups[0].provisional, min: groups[0].minRegistrations, price: groups[0].priceAgorot, cheque: groups[0].chequeAmountAgorot, version: groups[0].offerVersion },
+    { provisional: true, min: 3, price: 260000, cheque: 130000, version: "0123456789abcdef" },
+  );
+  assert.deepEqual(
+    { provisional: groups[1].provisional, min: groups[1].minRegistrations, price: groups[1].priceAgorot, version: groups[1].offerVersion },
+    { provisional: false, min: null, price: null, version: null },
+  );
+});
+
+test("plan B: the payload carries the offer version only with a group", () => {
+  const base = { idempotencyKey: "k-1234567890", visitorId: "v-1234567890", attribution: null };
+  const chosen = buildLeadPayload(formValues(), { ...base, groupId: "b".repeat(24), offerVersion: "0123456789abcdef" });
+  assert.deepEqual(Object.keys(chosen).sort(), ["consent", "grade", "groupId", "idempotencyKey", "offerVersion", "parentName", "parentPhone", "participantFirstName", "visitorId"].sort());
+  assert.equal(chosen.offerVersion, "0123456789abcdef");
+  assert.equal("offerVersion" in buildLeadPayload(formValues(), { ...base, offerVersion: "0123456789abcdef" }), false, "no group, no version");
+  assert.equal("offerVersion" in buildLeadPayload(formValues(), { ...base, groupId: "b".repeat(24), offerVersion: null }), false, "a legacy group carries none");
+});
+
+test("plan B: two new 409s — enrolment closed, and a changed price carrying the current offer", () => {
+  assert.equal(classifyOutcome(409, { error: "enrolment_closed" }), "enrolment_closed");
+  assert.equal(classifyOutcome(409, { error: "offer_changed", offer: {} }), "offer_changed");
+  assert.equal(classifyOutcome(409, { error: "group_full" }), "group_full");
+  assert.equal(classifyOutcome(409, { error: "idempotency_conflict" }), "conflict");
+  assert.deepEqual(changedOffer({ error: "offer_changed", offer: { priceAgorot: 280000, chequeAmountAgorot: 140000, chequeCount: 2, offerVersion: "fedcba9876543210" } }), {
+    priceAgorot: 280000,
+    chequeAmountAgorot: 140000,
+    chequeCount: 2,
+    offerVersion: "fedcba9876543210",
+  });
+  assert.equal(changedOffer({ error: "offer_changed", offer: { priceAgorot: 280000 } }), null);
+  assert.equal(changedOffer(null), null);
+});
+
+test("landing plan B: the size wording is neutral until a group says its numbers, and never the old fixed three", () => {
+  const markup = withoutCode(landing);
+  assert.doesNotMatch(markup, /3 תלמידים בלבד|עד שלושה תלמידים|מוגבל לשלושה תלמידים|<b>3<\/b><span>תלמידים בקבוצה/);
+  assert.match(markup, /<span id="size-chip">קבוצות קטנות<\/span>/);
+  assert.match(markup, /<b id="size-stat">קטנות<\/b><span id="size-stat-label">קבוצות<\/span>/);
+  assert.match(markup, /<p id="size-text">קבוצות קטנות, עם יחס אישי לכל תלמיד\.<\/p>/);
+  assert.match(markup, /<span class="limit-pill" id="size-pill">קבוצות קטנות, עם יחס אישי לכל תלמיד<\/span>/);
+  // The ten meetings stay as they were.
+  assert.match(markup, /<span>10 מפגשים<\/span>/);
+  const code = withoutComments(landing.slice(landing.indexOf('<script type="module">')));
+  assert.match(code, /describeGroupSize\(lead\.minRegistrations, lead\.capacity\)/);
+  assert.match(code, /const lead = groups\[0\] \?\? null;/, "the first open group in card order");
+  assert.match(code, /set\("size-text", "קבוצות קטנות של ", " תלמידים, עם יחס אישי לכל תלמיד\."\)/);
+  // The range is drawn left to right inside the right-to-left line.
+  assert.match(code, /node\.append\(el\("span", "num-ltr", size\)\)/);
+});
+
+test("landing plan B: the price block names no number until LIVE answers, then the brief's paragraph", () => {
+  const markup = withoutCode(landing);
+  assert.match(markup, /<div class="card price" id="price-block">/);
+  assert.match(markup, /<p id="price-text">המחיר ותנאי התשלום יוצגו כאן כשתיפתח קבוצה להרשמה\. אפשר גם לשאול את עמית ב-WhatsApp\.<\/p>/);
+  assert.doesNotMatch(markup, /₪|2,600|1,300|צ׳קים של/);
+  const code = withoutComments(landing.slice(landing.indexOf('<script type="module">')));
+  assert.match(code, /10 מפגשים · 20 שעות · \$\{price\.price\} ₪\. התשלום בשני צ׳קים של \$\{price\.cheque\} ₪, למפגש הראשון ולמפגש השישי\./);
+  assert.match(code, /ניתן לפרוש לפני המפגש השישי ולקבל את הצ׳ק השני בחזרה, ללא חיוב עבור יתרת המפגשים\./);
+});
+
+test("landing plan B: estimated dates are marked and explained; confirmed ones say so", () => {
+  const code = withoutComments(landing.slice(landing.indexOf('<script type="module">')));
+  assert.match(code, /group\.provisional \? "מועד משוער" : "מועד סופי"/);
+  assert.match(code, /מועד הפתיחה משוער\.\$\{forms\} עד לאישור הפתיחה, המועד עשוי להידחות בשבוע\. אין צורך בתשלום בשלב ההרשמה\./);
+  assert.match(code, /הקורס מתגבש עם הרשמה של \$\{group\.minRegistrations\} תלמידים לפחות;/);
+});
+
+test("landing plan B: the success message says the place is held and nothing is due; closed enrolment and a changed price have their own answers", () => {
+  const code = withoutComments(landing.slice(landing.indexOf('<script type="module">')));
+  assert.match(code, /המקום שמור לכם, ואין צורך בתשלום בשלב זה/);
+  assert.match(code, /case "enrolment_closed":/);
+  assert.match(code, /ההרשמה לקבוצה זו נסגרה/);
+  assert.match(code, /case "offer_changed":/);
+  // The form stays filled, the price is shown again, and only an explicit yes resubmits — under a
+  // fresh key, carrying the new version.
+  assert.match(code, /changedOffer\(result\.body\)/);
+  assert.match(code, /renderPrice\(selected\)/);
+  assert.match(code, /selected\.offerVersion = offer\.offerVersion;/);
+  assert.match(code, /id="accept-offer"/);
+  assert.match(code, /resetKeyState\(keys\);\s*form\.requestSubmit\(\);/);
+  assert.match(code, /offerVersion: selected\?\.offerVersion \?\? null/);
+  // The price the parent is asked to accept goes into HTML escaped.
+  assert.match(code, /escapeText\(price\.price\)/);
 });

@@ -224,6 +224,13 @@ details.meeting[open] .mchev{transform:rotate(180deg)}
 .gcard.is-full .seats{color:#fca5a5}
 .gwrap{display:flex;flex-direction:column}
 .gwrap .gcard{flex:1}
+.gcard .gbadge{justify-self:start;font-size:.78rem;font-weight:700;border-radius:999px;padding:3px 10px;
+  border:1px solid rgba(251,191,36,.45);color:#fde68a;background:rgba(251,191,36,.08)}
+.gcard .gbadge.final{border-color:rgba(34,211,238,.5);color:var(--cyan-soft);background:rgba(34,211,238,.08)}
+.sched .formation{color:var(--muted);margin:0;font-size:.93rem;border-inline-start:3px solid rgba(251,191,36,.5);padding-inline-start:12px}
+.price{margin-top:20px}
+.price p{margin:10px 0 0;color:var(--muted)}
+.price .accept{margin-top:12px}
 .wait{margin-top:8px}
 .wait button{background:none;border:1px dashed var(--line);color:var(--muted);border-radius:999px;
   padding:8px 16px;font:inherit;font-size:.9rem;cursor:pointer}
@@ -339,7 +346,7 @@ footer a{color:var(--muted);text-decoration:none}
     <span class="eyebrow">סדנה מעשית לתלמידי כיתות ז׳–ט׳</span>
     <h1><span>רעיון קטן.</span><span class="grad-text">אפליקציה אמיתית.</span></h1>
     <p class="lead">עשרה מפגשים שבהם לומדים לחשוב כמו מפתחים, לעבוד נכון עם AI ולבנות משחקים שאפשר לפתוח ולשחק.</p>
-    <div class="keyline" aria-label="עיקרי הסדנה"><span>10 מפגשים</span><span>3 תלמידים בלבד</span><span id="when-chip">ימי שישי</span></div>
+    <div class="keyline" aria-label="עיקרי הסדנה"><span>10 מפגשים</span><span id="size-chip">קבוצות קטנות</span><span id="when-chip">ימי שישי</span></div>
     <div class="btn-row">
       <a class="btn btn-primary" href="#contact">פרטים והרשמה</a>
       <a class="btn btn-ghost" href="#projects">למשחקים שבנינו</a>
@@ -410,7 +417,7 @@ footer a{color:var(--muted);text-decoration:none}
     <div class="stats">
       <div class="stat"><b>10</b><span>מפגשים</span></div>
       <div class="stat"><b>2</b><span>שעות בשבוע</span></div>
-      <div class="stat"><b>3</b><span>תלמידים בקבוצה</span></div>
+      <div class="stat"><b id="size-stat">קטנות</b><span id="size-stat-label">קבוצות</span></div>
       <div class="stat"><b>ז׳–ט׳</b><span>כיתות</span></div>
     </div>
   </div>
@@ -620,9 +627,15 @@ footer a{color:var(--muted);text-decoration:none}
       <!-- The title and the line below it are replaced by the open group's own hours, meeting
            count and location when LIVE answers; this wording is the offline fallback. -->
       <div class="fact"><div class="ic" id="when-glyph">⌁</div><h3 id="when-title">ימי שישי</h3><p id="when-text"><span class="num-ltr">10:00–12:00</span>, עשרה מפגשים שבועיים ביוקנעם.</p></div>
-      <div class="fact"><div class="ic">3</div><h3>עד שלושה תלמידים</h3><p>קבוצה שמאפשרת לכל תלמיד לבנות, לשאול ולקבל ליווי.</p></div>
+      <div class="fact"><div class="ic" id="size-ic">✦</div><h3>קבוצות קטנות</h3><p id="size-text">קבוצות קטנות, עם יחס אישי לכל תלמיד.</p></div>
       <div class="fact"><div class="ic">⌨</div><h3>מחשב נייד לכל תלמיד</h3><p>יש להביא מחשב נייד אישי ומטען כבר מהמפגש הראשון.</p></div>
       <div class="fact"><div class="ic">✓</div><h3>תוצר ותעודת סיום</h3><p>כל תלמיד מסיים עם משחק מקורי ויכול להסביר כיצד הוא עובד.</p></div>
+    </div>
+    <!-- The price and the cheques come from the open group (LIVE); this sentence is the fallback
+         and names no number. -->
+    <div class="card price" id="price-block">
+      <span class="eyebrow">מחיר ותשלום</span>
+      <p id="price-text">המחיר ותנאי התשלום יוצגו כאן כשתיפתח קבוצה להרשמה. אפשר גם לשאול את עמית ב-WhatsApp.</p>
     </div>
   </div>
 </section>
@@ -661,7 +674,7 @@ footer a{color:var(--muted);text-decoration:none}
 <section id="contact">
   <div class="wrap">
     <div class="signup">
-      <span class="limit-pill">המחזור הראשון מוגבל לשלושה תלמידים</span>
+      <span class="limit-pill" id="size-pill">קבוצות קטנות, עם יחס אישי לכל תלמיד</span>
       <h2>רוצים לבדוק אם הסדנה מתאימה?</h2>
       <p class="lead" style="margin-top:14px">השאירו פרטים ואחזור אליכם, או כתבו לי ישירות ב־WhatsApp. נדבר על הילד או הילדה, הניסיון הקודם ומה הם היו רוצים לבנות.</p>
 
@@ -730,7 +743,7 @@ footer a{color:var(--muted);text-decoration:none}
         </label>
 
         <button class="btn btn-primary" id="submit-btn" type="submit" style="width:100%;border:0">שלחו פרטים</button>
-        <p class="form-note" id="wait-note" hidden>ההרשמה היא לרשימת ההמתנה. מקום יישמר רק אם יתפנה, ולאחר תשלום.</p>
+        <p class="form-note" id="wait-note" hidden>ההרשמה היא לרשימת ההמתנה. אם יתפנה מקום, עמית יחזור אליכם.</p>
         <div class="form-msg" id="form-msg" role="status" aria-live="polite"></div>
       </form>
 
@@ -773,6 +786,7 @@ import {
   keyForSubmission,
   markUncertain,
   resetKeyState,
+  changedOffer,
 } from "./js/acquisition.js";
 import {
   fetchGroups,
@@ -780,6 +794,8 @@ import {
   formatSession,
   commonHours,
   describeAvailability,
+  describeGroupSize,
+  describePrice,
   glyphFor,
   WEEKDAY_LETTERS,
 } from "./js/schedule.js";
@@ -841,8 +857,8 @@ factsLabel?.addEventListener("click", () => {
 
    LIVE owns the schedule; this page asks for it on load and draws it.
    Nothing here is written into the page source, so a date changes in
-   the Engine Room and not in a deploy. Choosing a group reserves
-   nothing: a place is secured only when the payment is recorded.
+   the Engine Room and not in a deploy. Since Plan B a registration
+   for a group holds a place in it, with no payment at this stage.
 
    Everything drawn from the server goes in through textContent, so a
    label is always text and never markup.
@@ -891,6 +907,14 @@ function cardFor(group) {
   const when = el("div", "when");
   when.append(hours ? el("span", "num-ltr", hours) : document.createTextNode("שעות משתנות"));
   card.append(when, seatsRow(group));
+  // Estimated dates until the course is confirmed; the real start once it is.
+  const first = group.sessions[0] ? formatSession(group.sessions[0]) : null;
+  const badge = el("span", "gbadge" + (group.provisional ? "" : " final"), group.provisional ? "מועד משוער" : "מועד סופי");
+  if (first) {
+    badge.append(document.createTextNode(" · "));
+    badge.append(el("span", "num-ltr", first.dayMonth));
+  }
+  card.insertBefore(badge, when);
   card.addEventListener("click", () => { choose(group, false); });
 
   if (!group.full) return card;
@@ -928,6 +952,11 @@ function monthGrid(month) {
 function renderSchedule(group) {
   schedBox.textContent = "";
   schedBox.append(el("p", "intro", `בחרתם את קבוצת ${group.label}. להלן כל תאריכי המפגשים:`));
+  if (group.provisional) {
+    const forms = group.minRegistrations ? ` הקורס מתגבש עם הרשמה של ${group.minRegistrations} תלמידים לפחות;` : "";
+    schedBox.append(el("p", "formation",
+      `מועד הפתיחה משוער.${forms} עד לאישור הפתיחה, המועד עשוי להידחות בשבוע. אין צורך בתשלום בשלב ההרשמה. כשהקבוצה תתגבש ניצור איתכם קשר להסדרת התשלום, ולאחר מכן נאשר את מועדי הקורס.`));
+  }
 
   const months = el("div", "months");
   for (const month of layoutMonths(group.sessions)) months.append(monthGrid(month));
@@ -1001,8 +1030,47 @@ function adjustCopy() {
   if (group.locationLabel) text.append(document.createTextNode(` · ${group.locationLabel}`));
 }
 
+/* The group size and the price, from the first open group in card order. A number appears only
+   when the group says it; otherwise the page keeps the neutral wording it was written with. */
+function sizeAndPrice() {
+  const lead = groups[0] ?? null;
+  const size = lead ? describeGroupSize(lead.minRegistrations, lead.capacity) : null;
+  if (size) {
+    // The range goes in a num-ltr span like every other number on this page, so a right-to-left
+    // line cannot turn "3–4" into "4–3".
+    const set = (id, before, after) => {
+      const node = document.getElementById(id);
+      if (!node) return;
+      node.textContent = "";
+      if (before) node.append(document.createTextNode(before));
+      node.append(el("span", "num-ltr", size));
+      if (after) node.append(document.createTextNode(after));
+    };
+    set("size-chip", "", " תלמידים בקבוצה");
+    // The tile and the icon hold the number alone: left to right on the element itself, keeping
+    // their own large type.
+    for (const id of ["size-stat", "size-ic"]) {
+      const node = document.getElementById(id);
+      if (node) { node.textContent = size; node.dir = "ltr"; }
+    }
+    const label = document.getElementById("size-stat-label");
+    if (label) label.textContent = "תלמידים בקבוצה";
+    set("size-text", "קבוצות קטנות של ", " תלמידים, עם יחס אישי לכל תלמיד.");
+    set("size-pill", "קבוצות קטנות של ", " תלמידים, עם יחס אישי לכל תלמיד.");
+  }
+  renderPrice(lead);
+}
+
+function renderPrice(group) {
+  const text = document.getElementById("price-text");
+  const price = group ? describePrice(group.priceAgorot, group.chequeAmountAgorot) : null;
+  if (!text || !price) return;
+  text.textContent = `10 מפגשים · 20 שעות · ${price.price} ₪. התשלום בשני צ׳קים של ${price.cheque} ₪, למפגש הראשון ולמפגש השישי. שני הצ׳קים נמסרים מראש. אם הילד לא ירצה להמשיך לאחר המפגש החמישי, ניתן לפרוש לפני המפגש השישי ולקבל את הצ׳ק השני בחזרה, ללא חיוב עבור יתרת המפגשים.`;
+}
+
 async function loadGroups(options = {}) {
   groups = await fetchGroups(API_BASE, options);
+  sizeAndPrice();
   if (groups.length === 0) return;
   cardsBox.textContent = "";
   for (const group of groups) cardsBox.append(cardFor(group));
@@ -1086,7 +1154,7 @@ form.addEventListener("submit", async (event) => {
   markInvalid([]);
 
   const decision = keyForSubmission(keys, v);
-  const payload = buildLeadPayload(v, { idempotencyKey: decision.key, visitorId, attribution, groupId: v.groupId, waitlist: waitlistMode });
+  const payload = buildLeadPayload(v, { idempotencyKey: decision.key, visitorId, attribution, groupId: v.groupId, waitlist: waitlistMode, offerVersion: selected?.offerVersion ?? null });
   busy(true);
   show("info", decision.rotatedAfterUncertain
     ? "שיניתם פרטים אחרי ניסיון שלא אושר. הפרטים החדשים נשלחים כהרשמה חדשה; אם הניסיון הקודם כן נקלט, עמית יראה את שניהם."
@@ -1118,7 +1186,7 @@ form.addEventListener("submit", async (event) => {
       for (const el of form.querySelectorAll("input,select,textarea")) el.disabled = true;
       button.hidden = true;
       show("ok",
-        `ההרשמה נקלטה${selected ? (waitlistMode ? ` לרשימת ההמתנה של קבוצת ${escapeText(selected.label)}` : ` לקבוצת ${escapeText(selected.label)}`) : ""}. עמית יחזור אליכם בטלפון או ב-WhatsApp. ` +
+        `ההרשמה נקלטה${selected ? (waitlistMode ? ` לרשימת ההמתנה של קבוצת ${escapeText(selected.label)}` : ` לקבוצת ${escapeText(selected.label)}. המקום שמור לכם, ואין צורך בתשלום בשלב זה`) : ""}. עמית יחזור אליכם בטלפון או ב-WhatsApp. ` +
         `<br><button type="button" class="btn btn-ghost" id="another">להרשמת משתתף נוסף</button>`);
       document.getElementById("another").addEventListener("click", () => {
         done = false;
@@ -1148,7 +1216,7 @@ form.addEventListener("submit", async (event) => {
       });
       break;
     case "group_full":
-      // The last place was paid for while this form was open. Nothing was registered; the page
+      // The last place was taken while this form was open. Nothing was registered; the page
       // reloads the groups so the card shows the truth, and offers the waiting list instead.
       show("warn",
         "המקום האחרון בקבוצה נתפס בזמן מילוי הטופס, וההרשמה לא נשמרה. " +
@@ -1164,6 +1232,45 @@ form.addEventListener("submit", async (event) => {
         msg.className = "form-msg";
       });
       break;
+    case "enrolment_closed":
+      // The first lesson has begun, or Amit closed this group. Nothing was registered.
+      show("warn",
+        "ההרשמה לקבוצה זו נסגרה, וההרשמה לא נשמרה. " +
+        `<br><button type="button" class="btn btn-ghost" id="closed-refresh">רענון המועדים</button>` + WA_INSTEAD(v));
+      document.getElementById("closed-refresh").addEventListener("click", () => {
+        selected = null;
+        waitlistMode = false;
+        groupField.value = "";
+        waitNote.hidden = true;
+        schedBox.hidden = true;
+        void loadGroups({ cache: "no-store" });
+        show("", "");
+        msg.className = "form-msg";
+      });
+      break;
+    case "offer_changed": {
+      // The price changed while this page was open. Nothing was registered. The form stays filled;
+      // the price block shows the new terms; sending again needs an explicit yes, and goes as a new
+      // submission (a fresh key) carrying the new version.
+      const offer = changedOffer(result.body);
+      const price = offer ? describePrice(offer.priceAgorot, offer.chequeAmountAgorot) : null;
+      if (!offer || !price || !selected) {
+        show("err", "המחיר עודכן בזמן מילוי הטופס. רעננו את הדף ונסו שוב." + WA_INSTEAD(v));
+        break;
+      }
+      selected.priceAgorot = offer.priceAgorot;
+      selected.chequeAmountAgorot = offer.chequeAmountAgorot;
+      selected.offerVersion = offer.offerVersion;
+      renderPrice(selected);
+      show("warn",
+        `המחיר עודכן ל-${escapeText(price.price)} ₪ (שני צ׳קים של ${escapeText(price.cheque)} ₪) — אנא אשרו כדי להמשיך. ` +
+        `<br><button type="button" class="btn btn-primary accept" id="accept-offer">מאשרים את המחיר המעודכן ושולחים</button>`);
+      document.getElementById("accept-offer").addEventListener("click", () => {
+        resetKeyState(keys);
+        form.requestSubmit();
+      });
+      break;
+    }
     case "rate_limited":
       show("warn", "נשלחו יותר מדי בקשות מהמכשיר הזה. חכו כמה דקות ונסו שוב." + WA_INSTEAD(v));
       break;

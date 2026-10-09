@@ -6,7 +6,14 @@
 //
 //   GET {API_BASE}/api/acquisition/groups
 //     → { groups: [ { id, label, capacity, available, full, locationLabel,
+//                     minRegistrations, reserved, provisional, enrolmentOpen,          (Plan B)
+//                     priceAgorot, chequeCount, chequeAmountAgorot, offerVersion,       (Plan B)
 //                     sessions: [ { n, date: 'YYYY-MM-DD', start: 'HH:MM', end: 'HH:MM', note } ] } ] }
+//
+// Plan B (Oct 2026): every active registration holds a place, so `available` already counts
+// registrations. The Plan B fields are null on a group that existed before Plan B; every helper
+// below degrades to the neutral wording when they are missing, so this page is safe against both
+// the old and the new LIVE.
 //
 // and turns them into the shapes the page draws: a month grid with the meeting days marked by
 // Amit's own numbers, and one readable line per meeting. When the call fails or no group is open
@@ -127,6 +134,37 @@ export function describeAvailability(capacity, available) {
 }
 
 /**
+ * "3–4" when a course forms at 3 and holds 4; "3" when the two are the same; null when the group
+ * does not say (a group from before Plan B, or a page talking to an older LIVE) — the page then
+ * keeps its neutral wording and never invents a number.
+ */
+export function describeGroupSize(minRegistrations, capacity) {
+  const min = Number(minRegistrations);
+  const max = Number(capacity);
+  if (!Number.isInteger(min) || !Number.isInteger(max) || min < 1 || max < min) return null;
+  return min === max ? String(max) : `${min}–${max}`;
+}
+
+/** 260000 agorot → "2,600". Whole shekels with a thousands comma, the way the page writes prices. */
+export function formatShekels(agorot) {
+  const value = Number(agorot);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const shekels = value / 100;
+  return Number.isInteger(shekels) ? shekels.toLocaleString("en-US") : shekels.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/**
+ * The course price as the page prints it, or null when the group does not carry one (the page
+ * then shows the neutral block that names no number). Two cheques, always.
+ */
+export function describePrice(priceAgorot, chequeAmountAgorot) {
+  const price = formatShekels(priceAgorot);
+  const cheque = formatShekels(chequeAmountAgorot);
+  if (price === null || cheque === null || Number(chequeAmountAgorot) * 2 !== Number(priceAgorot)) return null;
+  return { price, cheque };
+}
+
+/**
  * The open groups, or an empty list.
  *
  * Never throws and never blocks the page: registration worked before this endpoint existed and
@@ -170,6 +208,8 @@ function normalizeGroup(group) {
     .sort((a, b) => a.n - b.n);
   const capacity = Number(group.capacity) || 0;
   const available = Math.max(0, Math.min(capacity, Number(group.available) || 0));
+  const minRegistrations = Number.isInteger(group.minRegistrations) && group.minRegistrations >= 1 ? group.minRegistrations : null;
+  const price = describePrice(group.priceAgorot, group.chequeAmountAgorot);
   return {
     id: group.id,
     label: group.label.trim(),
@@ -178,5 +218,12 @@ function normalizeGroup(group) {
     full: group.full === true || available === 0,
     locationLabel: typeof group.locationLabel === "string" && group.locationLabel.trim() !== "" ? group.locationLabel.trim() : null,
     sessions,
+    // Plan B. Absent on an older LIVE or a group from before Plan B: the page shows final-looking
+    // dates with no badge, no price and the neutral size wording.
+    minRegistrations,
+    provisional: group.provisional === true,
+    priceAgorot: price === null ? null : Number(group.priceAgorot),
+    chequeAmountAgorot: price === null ? null : Number(group.chequeAmountAgorot),
+    offerVersion: typeof group.offerVersion === "string" && /^[0-9a-f]{16}$/.test(group.offerVersion) ? group.offerVersion : null,
   };
 }

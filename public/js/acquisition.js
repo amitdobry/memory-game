@@ -6,15 +6,19 @@
 //   /api/acquisition/visit   {visitorId, ref?|b?}          → 202 {ok, recognised}
 //   /api/acquisition/lead    {contact fields, consent,      → 201 {ok, leadRef, replay:false}
 //                             idempotencyKey, visitorId?,     200 {ok, leadRef, replay:true}
-//                             groupId?, waitlist?, ref?|b?}   400 {error:'invalid_request', fields}
-//                                                             409 {error:'idempotency_conflict'}
+//                             groupId?, offerVersion?,       400 {error:'invalid_request', fields}
+//                             waitlist?, ref?|b?}            409 {error:'idempotency_conflict'}
 //                                                             409 {error:'group_full'}
+//                                                             409 {error:'enrolment_closed'}
+//                                                             409 {error:'offer_changed', offer}
 //                                                             429 {error:'rate_limited'}
 //                                                             503 {error:'acquisition_unavailable'}
 //
 // The groups themselves — which are open, when they meet and how many places are left — come from
-// GET /api/acquisition/groups and live in `schedule.js`. Choosing a group reserves nothing: a
-// place is secured when Amit records the payment.
+// GET /api/acquisition/groups and live in `schedule.js`. Since Plan B (Oct 2026) a registration
+// for a group holds a place in it, with no payment at this stage; the price the parent saw travels
+// back as `offerVersion`, so a price that changed while the page was open is shown again and
+// accepted explicitly rather than taken for granted.
 //
 // What this file never does: store a name, phone, email or note anywhere in the browser (only
 // the random visitor id and the leaflet attribution are remembered), put contact details in a
@@ -85,6 +89,7 @@ export const FIELD_LABELS = {
   note: "ההערה",
   consent: "אישור יצירת הקשר",
   groupId: "מועד",
+  offerVersion: "המחיר",
 };
 
 // --- the visitor id ---------------------------------------------------------
@@ -177,12 +182,15 @@ export function missingFields(values, { requireGroup = false } = {}) {
  * only when they deliberately chose to wait for a place in a full group — never as `false`, which
  * would be the browser asserting a state it does not own.
  */
-export function buildLeadPayload(values, { idempotencyKey, visitorId, attribution, groupId, waitlist }) {
+export function buildLeadPayload(values, { idempotencyKey, visitorId, attribution, groupId, waitlist, offerVersion }) {
   return {
     ...normalizeForm(values),
     consent: true,
     idempotencyKey,
     ...(groupId ? { groupId } : {}),
+    // The version of the price the page showed for that group — only with a group, only when the
+    // group carried one.
+    ...(groupId && typeof offerVersion === "string" && offerVersion !== "" ? { offerVersion } : {}),
     ...(groupId && waitlist === true ? { waitlist: true } : {}),
     ...(visitorId ? { visitorId } : {}),
     ...referralFields(attribution),
@@ -199,13 +207,33 @@ export function classifyOutcome(status, body) {
   if (status === 201 && body?.ok) return "created";
   if (status === 200 && body?.ok) return "replay";
   if (status === 400) return "invalid";
-  // Two different 409s: the group filled while the form was open, or the same idempotency key was
-  // reused for a different submission.
-  if (status === 409) return body?.error === "group_full" ? "group_full" : "conflict";
+  // Four different 409s: the group filled while the form was open; its first lesson began (or Amit
+  // closed it); the price changed since the page loaded; or the same idempotency key was reused
+  // for a different submission.
+  if (status === 409) {
+    if (body?.error === "group_full") return "group_full";
+    if (body?.error === "enrolment_closed") return "enrolment_closed";
+    if (body?.error === "offer_changed") return "offer_changed";
+    return "conflict";
+  }
   if (status === 429) return "rate_limited";
   if (status === 503) return "unavailable";
   if (status === 404 || status === 405) return "unavailable";
   return "error";
+}
+
+/**
+ * The offer an `offer_changed` answer carries, checked, or null. The page shows it and asks the
+ * parent to accept it; the resubmission carries its `offerVersion` under a fresh key.
+ */
+export function changedOffer(body) {
+  const offer = body?.offer;
+  if (!offer || typeof offer !== "object") return null;
+  const price = Number(offer.priceAgorot);
+  const cheque = Number(offer.chequeAmountAgorot);
+  const version = typeof offer.offerVersion === "string" && /^[0-9a-f]{16}$/.test(offer.offerVersion) ? offer.offerVersion : null;
+  if (!Number.isInteger(price) || price <= 0 || !Number.isInteger(cheque) || cheque <= 0 || version === null) return null;
+  return { priceAgorot: price, chequeAmountAgorot: cheque, chequeCount: Number(offer.chequeCount) || 2, offerVersion: version };
 }
 
 /** Labels for the server's field names, joined for a sentence. */
