@@ -58,6 +58,17 @@ import {
   fetchGroups,
 } from "../public/js/schedule.js";
 import { CONTRACT_VERSION } from "../public/js/contract.js";
+import {
+  SECTIONS,
+  TARGETS,
+  TARGET_NAMES,
+  MAX_CLICKS,
+  scrollDepth,
+  targetOf,
+  createTracker,
+  sendActivity,
+  startEngagement,
+} from "../public/js/engagement.js";
 import { FIELDS, STARTER_CONFIG, THEME_CARD_SET, FIREKEEPER_FACES } from "../public/js/schema.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -815,4 +826,159 @@ test("landing plan B: the success message says the place is held and nothing is 
   assert.match(code, /offerVersion: selected\?\.offerVersion \?\? null/);
   // The price the parent is asked to accept goes into HTML escaped.
   assert.match(code, /escapeText\(price\.price\)/);
+});
+
+// ---------------------------------------------------------------------------
+// engagement.js — what a visitor did on the page (LIVE AN-20)
+// ---------------------------------------------------------------------------
+
+test("engagement: scroll depth is a percentage rounded to 5 and clamped", () => {
+  assert.equal(scrollDepth(0, 800, 4000), 20);
+  assert.equal(scrollDepth(1100, 800, 4000), 50); // 47.5 → 50
+  assert.equal(scrollDepth(1080, 800, 4000), 45); // 47.0 → 45
+  assert.equal(scrollDepth(5000, 800, 4000), 100);
+  assert.equal(scrollDepth(0, 800, 0), 0);
+});
+
+test("engagement: only whitelisted targets are recorded; anything else is dropped", () => {
+  const el = (matches) => ({ closest: (selector) => (matches.includes(selector) ? {} : null) });
+  assert.equal(targetOf(el(["#preview-link"])), "game-memory");
+  assert.equal(targetOf(el(["#game-workshop"])), "game-workshop");
+  assert.equal(targetOf(el(["#wa-link"])), "whatsapp");
+  assert.equal(targetOf(el([".some-other-link"])), null);
+  assert.equal(targetOf(null), null);
+  const tracker = createTracker();
+  tracker.click(100, "game-rhythm");
+  tracker.click(200, "buy-now");
+  tracker.click(300, "form-focus");
+  tracker.section("projects");
+  tracker.section("pricing");
+  tracker.section("projects");
+  const snap = tracker.snapshot(400, { viewId: "view-12345678", visitorId: "browser-12345678" });
+  assert.deepEqual(snap.clicks, [{ target: "game-rhythm", at: 100 }, { target: "form-focus", at: 300 }]);
+  assert.deepEqual(snap.sectionsSeen, ["projects"]);
+});
+
+test("engagement: active time stops 30 s after the last input; visible time stops when hidden", () => {
+  const tracker = createTracker({ visible: true });
+  tracker.input(0);
+  tracker.scroll(10_000, 40);
+  tracker.scroll(10_100, 55); // within 250 ms: depth counts, the scroll count does not
+  // Idle from 10.1 s: active until 40.1 s, visible until hidden at 60 s.
+  tracker.visibility(60_000, false);
+  // Hidden for a minute: neither clock runs.
+  tracker.visibility(120_000, true);
+  tracker.input(125_000);
+  const snap = tracker.snapshot(130_000, { viewId: "view-12345678", visitorId: "browser-12345678" });
+  assert.equal(snap.visibleMs, 60_000 + 10_000);
+  assert.equal(snap.activeMs, 40_100 + 5_000);
+  assert.equal(snap.scrollDepthPct, 55);
+  assert.equal(snap.scrollCount, 1);
+});
+
+test("engagement: the payload is exactly the eight fields LIVE accepts, with caps", () => {
+  const tracker = createTracker();
+  for (let i = 0; i < MAX_CLICKS + 10; i += 1) tracker.click(i, "nav-inside");
+  for (const id of [...SECTIONS, ...SECTIONS]) tracker.section(id);
+  const snap = tracker.snapshot(1_000, { viewId: "view-12345678", visitorId: "browser-12345678" });
+  assert.deepEqual(Object.keys(snap).sort(), ["activeMs", "clicks", "scrollCount", "scrollDepthPct", "sectionsSeen", "viewId", "visibleMs", "visitorId"]);
+  assert.equal(snap.clicks.length, MAX_CLICKS);
+  assert.deepEqual(snap.sectionsSeen, SECTIONS);
+  assert.ok(snap.clicks.every((c) => Object.keys(c).join() === "target,at"));
+});
+
+test("engagement: sent with sendBeacon as a plain string, keepalive fetch as the fallback, never a throw", () => {
+  const sent = [];
+  const beacon = { sendBeacon: (url, body) => { sent.push({ url, body }); return true; } };
+  assert.equal(sendActivity("http://x/api/acquisition/activity", { a: 1 }, { navigatorImpl: beacon }), "beacon");
+  assert.deepEqual(sent, [{ url: "http://x/api/acquisition/activity", body: '{"a":1}' }]);
+  let init = null;
+  const fetchImpl = (_url, i) => { init = i; return Promise.resolve({}); };
+  assert.equal(sendActivity("http://x/a", { a: 1 }, { navigatorImpl: { sendBeacon: () => false }, fetchImpl }), "fetch");
+  assert.equal(init.keepalive, true);
+  assert.equal(init.headers["content-type"], "text/plain;charset=UTF-8");
+  const throwing = { sendBeacon: () => { throw new Error("x"); } };
+  assert.equal(sendActivity("http://x/a", {}, { navigatorImpl: throwing, fetchImpl: () => { throw new Error("y"); } }), "none");
+});
+
+test("engagement: wired to a fake page, a hidden tab sends the view's state to LIVE", () => {
+  const listeners = {};
+  const on = (scope) => (type, fn) => {
+    const key = scope + ":" + type;
+    (listeners[key] ??= []).push(fn);
+  };
+  let clock = 0;
+  const beacons = [];
+  const doc = { visibilityState: "visible", documentElement: { scrollHeight: 2000 }, addEventListener: on("doc"), getElementById: () => null };
+  const win = {
+    scrollY: 0,
+    innerHeight: 1000,
+    navigator: { sendBeacon: (url, body) => { beacons.push({ url, body: JSON.parse(body) }); return true; } },
+    addEventListener: on("win"),
+    setTimeout: () => 0,
+    performance: { now: () => clock },
+  };
+  startEngagement({ win, doc, apiBase: "https://live.example", viewId: "view-12345678", visitorId: "browser-12345678", now: () => clock });
+  clock = 1_000;
+  win.scrollY = 1000;
+  listeners["win:scroll"].forEach((fn) => fn());
+  clock = 2_000;
+  listeners["doc:click"].forEach((fn) => fn({ target: { closest: (s) => (s === "#game-rhythm" ? {} : null) } }));
+  clock = 3_000;
+  doc.visibilityState = "hidden";
+  listeners["doc:visibilitychange"].forEach((fn) => fn());
+  assert.equal(beacons.length, 1);
+  assert.equal(beacons[0].url, "https://live.example/api/acquisition/activity");
+  assert.deepEqual(beacons[0].body, {
+    viewId: "view-12345678",
+    visitorId: "browser-12345678",
+    scrollDepthPct: 100,
+    scrollCount: 1,
+    sectionsSeen: [],
+    clicks: [{ target: "game-rhythm", at: 2000 }],
+    activeMs: 2000, // no input before the scroll at 1 s: the first second was visible, not active
+    visibleMs: 3000,
+  });
+});
+
+test("engagement: every selector names an element on the landing page, and the second game is #game-workshop", () => {
+  assert.match(landing, /<a class="game" id="game-workshop" href="https:\/\/amitdobry\.github\.io\/workshop-game\/"/);
+  for (const id of SECTIONS) assert.match(landing, new RegExp('id="' + id + '"'), id);
+  for (const [, selector] of TARGETS) {
+    const id = /^#([a-z-]+)$/.exec(selector)?.[1];
+    if (id) assert.match(landing, new RegExp('id="' + id + '"'), selector);
+  }
+  assert.match(landing, /class="nav-cta"/);
+  assert.match(landing, /id="top"[\s\S]*?class="btn btn-primary"/);
+  for (const anchor of ["curriculum", "inside", "projects", "contact"]) assert.match(landing, new RegExp('<a href="#' + anchor + '">'));
+});
+
+test("engagement: loaded by a guarded dynamic import, records no form text and stores nothing", () => {
+  const script = landing.slice(landing.indexOf('<script type="module">'));
+  assert.match(script, /import\("\.\/js\/engagement\.js"\)[\s\S]*?\.catch\(/);
+  assert.ok(fs.existsSync(path.join(PUBLIC, "js", "engagement.js")));
+  const source = withoutComments(read("js/engagement.js"));
+  assert.doesNotMatch(source, /localStorage|sessionStorage|document\.cookie|\.value\b|textContent|innerText|innerHTML|clientX|clientY|pageX|pageY|screen\.|navigator\.language|document\.referrer/);
+});
+
+test("engagement: the visit beacon carries viewId — three fields — and drops a malformed one", async () => {
+  let posted = null;
+  const okFetch = async (_url, init) => { posted = JSON.parse(init.body); return { status: 202, json: async () => ({ ok: true }) }; };
+  await sendVisit("http://x", "v-1234567890", { kind: "ref", code: "LEAF5" }, { fetchImpl: okFetch, viewId: "view-1234567890" });
+  assert.deepEqual(posted, { visitorId: "v-1234567890", viewId: "view-1234567890", ref: "LEAF5" });
+  await sendVisit("http://x", "v-1234567890", null, { fetchImpl: okFetch, viewId: "<bad>" });
+  assert.deepEqual(posted, { visitorId: "v-1234567890" });
+});
+
+test("engagement: the whitelist mirrors LIVE's (skipped when LIVE is not checked out beside this repo)", (t) => {
+  const live = path.join(ROOT, "..", "Live", "src", "acquisition", "constants.ts");
+  if (!fs.existsSync(live)) return t.skip("LIVE not found at ../Live");
+  const source = fs.readFileSync(live, "utf8");
+  const list = (name) => {
+    const block = new RegExp("export const " + name + " = \\[([\\s\\S]*?)\\] as const").exec(source)?.[1] ?? "";
+    return [...block.matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
+  };
+  if (list("ENGAGEMENT_SECTIONS").length === 0) return t.skip("this LIVE checkout predates engagement");
+  assert.deepEqual(SECTIONS, list("ENGAGEMENT_SECTIONS"));
+  assert.deepEqual([...TARGET_NAMES].sort(), list("ENGAGEMENT_CLICK_TARGETS").sort());
 });

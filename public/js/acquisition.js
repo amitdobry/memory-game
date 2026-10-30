@@ -3,7 +3,7 @@
 //
 // Two endpoints, both POST, both JSON, both answered with a small status object:
 //
-//   /api/acquisition/visit   {visitorId, ref?|b?}          → 202 {ok, recognised}
+//   /api/acquisition/visit   {visitorId, viewId?, ref?|b?} → 202 {ok, recognised}
 //   /api/acquisition/lead    {contact fields, consent,      → 201 {ok, leadRef, replay:false}
 //                             idempotencyKey, visitorId?,     200 {ok, leadRef, replay:true}
 //                             groupId?, offerVersion?,       400 {error:'invalid_request', fields}
@@ -267,10 +267,18 @@ export async function postJson(url, payload, { fetchImpl = globalThis.fetch, tim
   }
 }
 
-/** The visit beacon. Fire and forget: no outcome, no error, no effect on the page. */
+/**
+ * The visit beacon. Fire and forget: no outcome, no error, no effect on the page. `options.viewId`
+ * names this page load, so the engagement beacon (`engagement.js`) can attach to the same view.
+ */
 export async function sendVisit(apiBase, visitorId, attribution, options = {}) {
+  const { viewId, ...rest } = options;
   try {
-    await postJson(`${apiBase}/api/acquisition/visit`, { visitorId, ...referralFields(attribution) }, { ...options, timeoutMs: options.timeoutMs ?? BEACON_TIMEOUT_MS });
+    await postJson(
+      `${apiBase}/api/acquisition/visit`,
+      { visitorId, ...(typeof viewId === "string" && VISITOR_ID.test(viewId) ? { viewId } : {}), ...referralFields(attribution) },
+      { ...rest, timeoutMs: rest.timeoutMs ?? BEACON_TIMEOUT_MS },
+    );
   } catch {
     /* tracking must never break the page */
   }

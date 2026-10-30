@@ -589,7 +589,7 @@ footer a{color:var(--muted);text-decoration:none}
         <p>כך נראה משחק זיכרון גמור, מהסוג שהמשתתפים בונים ומשנים במפגש הראשון: לוח, טיימר, ניקוד ועולם של חלל. שחקו בו ישר בדפדפן, בלי הרשמה. את השינויים בעזרת ה-AI עושים המשתתפים בסדנה עצמה.</p>
         <span class="go">פתחו את המשחק ↗</span>
       </a>
-      <a class="game" href="https://amitdobry.github.io/workshop-game/" target="_blank" rel="noopener">
+      <a class="game" id="game-workshop" href="https://amitdobry.github.io/workshop-game/" target="_blank" rel="noopener">
         <div class="art">▢ ▣ ▤</div>
         <span class="tag">דוגמה 02</span>
         <h3>מנוע משחק הלוח</h3>
@@ -776,6 +776,7 @@ import { resolveAttribution, whatsappLink } from "./js/attribution.js";
 import { API_BASE } from "./js/api.js";
 import {
   getVisitorId,
+  newVisitorId,
   sendVisit,
   buildLeadPayload,
   missingFields,
@@ -815,7 +816,23 @@ const attribution = resolveAttribution(location.search, storage);
    proven scan), sent with the referral. Nothing on the page waits for it.
    ------------------------------------------------------------------ */
 const visitorId = getVisitorId(storage);
-void sendVisit(API_BASE, visitorId, attribution);
+const viewId = newVisitorId();
+void sendVisit(API_BASE, visitorId, attribution, { viewId });
+
+/* ------------------------------------------------------------------
+   What the visitor did on this page (engagement.js): scroll depth, the
+   sections seen, a fixed list of clicks, reading time. Nothing typed,
+   nothing stored. Loaded with a dynamic import so that a missing or
+   broken module cannot stop this script: the page is exactly as it was.
+   ------------------------------------------------------------------ */
+let engagement = null;
+import("./js/engagement.js")
+  .then(({ startEngagement }) => {
+    engagement = startEngagement({ win: window, doc: document, apiBase: API_BASE, viewId, visitorId });
+  })
+  .catch(() => {
+    /* tracking must never break the page */
+  });
 
 /* ------------------------------------------------------------------
    WhatsApp alternative: a greeting with the leaflet marker, nothing else.
@@ -848,6 +865,7 @@ factsLabel?.addEventListener("click", () => {
   labelTaps = labelTaps.filter((t) => now - t < 2000).concat(now);
   if (labelTaps.length < 5) return;
   labelTaps = [];
+  try { engagement?.signal("claim"); engagement?.flush(); } catch { /* never in the way */ }
   const query = attribution?.kind === "ref" ? `?ref=${encodeURIComponent(attribution.code)}` : attribution?.kind === "batch" ? `?b=${encodeURIComponent(attribution.number)}` : "";
   location.href = `${API_BASE}/distributor/claim${query}`;
 });
